@@ -1,105 +1,89 @@
-// ─────────────────────────────────────────
-// da el exhaustive testbench ba test en kol 7aga sha8ala sa7 zai ma elmafrod teshta8al
-// d kolo tab3an hardcode
-// 34an tefhamooh aktar e3tebro el kol (RemoteInsert/RemoteDelete) (da el server)
-// ─────────────────────────────────────────
+public class Main
+{
+    public static void main(String[] args)
+    {
 
-public class Main {
-    public static void main(String[] args) {
-
-        System.out.println("═══ TEST 1: Basic Sequential Insert ═══");
-        DocumentCRDT crdtA = new DocumentCRDT("A");
-        DocumentCRDT crdtB = new DocumentCRDT("B");
-        DocumentCRDT crdtC = new DocumentCRDT("C");
-
-        //user a katab 7agat de fel computer bta3o
-        //tabe3y locally inserted fel computer bta3o
-        CharacterNode h  = crdtA.localInsert('H', null, 0);
-        CharacterNode e  = crdtA.localInsert('E', h.siteId,  h.clock);
-        CharacterNode l1 = crdtA.localInsert('L', e.siteId,  e.clock);
-        CharacterNode l2 = crdtA.localInsert('L', l1.siteId, l1.clock);
-        CharacterNode o  = crdtA.localInsert('O', l2.siteId, l2.clock);
-
-        //server hay broadcast el7aga de le b2y el users
-        for (CharacterNode c : new CharacterNode[]{h, e, l1, l2, o}) {
-            crdtB.remoteInsert(c);
-            crdtC.remoteInsert(c);
-        }
-
-        //ha call elfunction el 3amelha 34an te simulate el user interface
-        System.out.println("A: " + crdtA.getVisibleText()); // HELLO
-        System.out.println("B: " + crdtB.getVisibleText()); // HELLO
-        System.out.println("C: " + crdtC.getVisibleText()); // HELLO
+        System.out.println("═══ TEST 1: New Document Has One Empty Block ═══");
+        DocumentBlockCRDT docA = new DocumentBlockCRDT("A");
+        DocumentBlockCRDT docB = new DocumentBlockCRDT("B");
+        docB.LocalDelete("B", 1);  // B is joining, remove auto-created first block
+        System.out.println("A: '" + docA.getVisibleText() + "'"); // one empty line
 
 
-        System.out.println("\n═══ TEST 2: Concurrent Insert Same Position ═══");
-        CharacterNode x = crdtA.localInsert('X', e.siteId, e.clock);
-        CharacterNode y = crdtB.localInsert('Y', e.siteId, e.clock);
-        crdtA.remoteInsert(y);
-        crdtB.remoteInsert(x);
-        System.out.println("A: " + crdtA.getVisibleText()); // must match B
-        System.out.println("B: " + crdtB.getVisibleText()); // must match A
+        System.out.println("\n═══ TEST 2: Type Text Into First Block ═══");
+        BlockNode firstBlockA = docA.getBlock("A", 1);
+        CharacterNode h  = firstBlockA.content.localInsert('H', null, 0);
+        CharacterNode e  = firstBlockA.content.localInsert('E', h.siteId,  h.clock);
+        CharacterNode l1 = firstBlockA.content.localInsert('L', e.siteId,  e.clock);
+        CharacterNode l2 = firstBlockA.content.localInsert('L', l1.siteId, l1.clock);
+        CharacterNode o  = firstBlockA.content.localInsert('O', l2.siteId, l2.clock);
+        System.out.println("A: " + docA.getVisibleText()); // HELLO
 
 
-        System.out.println("\n═══ TEST 3: Basic Delete (Tombstone) ═══");
-        //user A masa7 fel laptop bta3o
-        //server  broadcast el delet le user B kaman
-        crdtA.localDelete(e.siteId, e.clock);
-        crdtB.remoteDelete(e.siteId, e.clock);
-        System.out.println("A: " + crdtA.getVisibleText()); // no E
-        System.out.println("B: " + crdtB.getVisibleText()); // no E
-        System.out.println("A internal: " + crdtA.getInternalState());
+        System.out.println("\n═══ TEST 3: Press Enter - Create New Block ═══");
+        BlockNode secondBlockA = docA.LocalInsert("A", 1);
+        CharacterNode w  = secondBlockA.content.localInsert('W', null, 0);
+        CharacterNode or = secondBlockA.content.localInsert('O', w.siteId,  w.clock);
+        CharacterNode r  = secondBlockA.content.localInsert('R', or.siteId, or.clock);
+        CharacterNode ld = secondBlockA.content.localInsert('L', r.siteId,  r.clock);
+        CharacterNode d  = secondBlockA.content.localInsert('D', ld.siteId, ld.clock);
+        System.out.println("A: " + docA.getVisibleText()); // HELLO\nWORLD
 
 
-        System.out.println("\n═══ TEST 4: Insert After Deleted Character ═══");
-        CharacterNode k = crdtA.localInsert('K', h.siteId, h.clock);
-        crdtB.remoteInsert(k);
-        System.out.println("A: " + crdtA.getVisibleText());
-        System.out.println("B: " + crdtB.getVisibleText()); // must match
+        System.out.println("\n═══ TEST 4: Sync Blocks to User B ═══");
+        docB.remoteInsert(firstBlockA);
+        docB.remoteInsert(secondBlockA);
+        System.out.println("A: " + docA.getVisibleText()); // HELLO\nWORLD
+        System.out.println("B: " + docB.getVisibleText()); // must match A
 
 
-        System.out.println("\n═══ TEST 5: Double Delete Same Character ═══");
-        crdtA.remoteDelete(e.siteId, e.clock); // already deleted, no crash
-        System.out.println("A: " + crdtA.getVisibleText()); // same, no crash
+        System.out.println("\n═══ TEST 5: Concurrent Block Insert Same Position ═══");
+        BlockNode blockFromA = docA.LocalInsert(firstBlockA.siteId, firstBlockA.clock);
+        BlockNode blockFromB = docB.LocalInsert(firstBlockA.siteId, firstBlockA.clock);
+        blockFromA.content.localInsert('X', null, 0);
+        blockFromB.content.localInsert('Y', null, 0);
+        docA.remoteInsert(blockFromB);
+        docB.remoteInsert(blockFromA);
+        System.out.println("A: " + docA.getVisibleText()); // must match B
+        System.out.println("B: " + docB.getVisibleText()); // must match A
 
 
-        System.out.println("\n═══ TEST 6: Insert at Very End ═══");
-        CharacterNode bang = crdtA.localInsert('!', o.siteId, o.clock);
-        crdtB.remoteInsert(bang);
-        System.out.println("A: " + crdtA.getVisibleText());
-        System.out.println("B: " + crdtB.getVisibleText()); // must match
+        System.out.println("\n═══ TEST 6: Delete a Block ═══");
+        docA.LocalDelete(secondBlockA.siteId, secondBlockA.clock);
+        docB.remoteDelete(secondBlockA.siteId, secondBlockA.clock);
+        System.out.println("A: " + docA.getVisibleText()); // no WORLD
+        System.out.println("B: " + docB.getVisibleText()); // must match A
 
 
-        System.out.println("\n═══ TEST 7: Insert at Very Beginning ═══");
-        CharacterNode z1 = crdtA.localInsert('Z', null, 0);
-        CharacterNode z2 = crdtB.localInsert('W', null, 0);
-        crdtA.remoteInsert(z2);
-        crdtB.remoteInsert(z1);
-        System.out.println("A: " + crdtA.getVisibleText()); // must match B
-        System.out.println("B: " + crdtB.getVisibleText()); // must match A
+        System.out.println("\n═══ TEST 7: Double Delete Same Block ═══");
+        docA.remoteDelete(secondBlockA.siteId, secondBlockA.clock); // already deleted, no crash
+        System.out.println("A: " + docA.getVisibleText()); // same, no crash
 
 
-        System.out.println("\n═══ TEST 8: Three Users Concurrent Insert ═══");
-        CharacterNode p = crdtA.localInsert('P', l1.siteId, l1.clock);
-        CharacterNode q = crdtB.localInsert('Q', l1.siteId, l1.clock);
-        CharacterNode r = crdtC.localInsert('R', l1.siteId, l1.clock);
-        //Han5aly c te match bas 34an el tests el fatet
-        crdtC.remoteInsert(x);
-        crdtC.remoteInsert(y);
-        crdtC.remoteInsert(k);
-        crdtC.remoteInsert(bang);
-        crdtC.remoteInsert(z1);
-        crdtC.remoteInsert(z2);
-        //ne3mel b2a el new insertions 3alehom
-        crdtA.remoteInsert(q);
-        crdtA.remoteInsert(r);
-        crdtB.remoteInsert(p);
-        crdtB.remoteInsert(r);
-        crdtC.remoteInsert(p);
-        crdtC.remoteInsert(q);
-        System.out.println("A: " + crdtA.getVisibleText()); // all must match
-        System.out.println("B: " + crdtB.getVisibleText());
-        System.out.println("C: " + crdtC.getVisibleText());
+
+        System.out.println("\n═══ TEST 8: Three Users Concurrent Block Insert ═══");
+        DocumentBlockCRDT docC = new DocumentBlockCRDT("C");
+        docC.LocalDelete("C", 1);  // C is joining, remove auto-created first block
+
+        // give C the base document first
+        docC.remoteInsert(firstBlockA);
+        docC.remoteInsert(secondBlockA);
+
+        // give C the concurrent blocks from A and B BEFORE C inserts its own
+        docC.remoteInsert(blockFromA);
+        docC.remoteInsert(blockFromB);
+
+        // NOW C inserts its own block
+        BlockNode blockFromC = docC.LocalInsert(firstBlockA.siteId, firstBlockA.clock);
+        blockFromC.content.localInsert('Z', null, 0);
+
+        // sync C's block to A and B
+        docA.remoteInsert(blockFromC);
+        docB.remoteInsert(blockFromC);
+
+        System.out.println("A: " + docA.getVisibleText()); // all must match
+        System.out.println("B: " + docB.getVisibleText());
+        System.out.println("C: " + docC.getVisibleText());
 
     }
 }

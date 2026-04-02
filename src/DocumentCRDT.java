@@ -123,7 +123,8 @@ public class DocumentCRDT  {
 
             // stop if this character points to a DIFFERENT afterId
             // meaning it belongs to a different part of the document
-            if (!current.afterSiteId.equals(incoming.afterSiteId) ||
+            if (current.afterSiteId == null ||
+                    !current.afterSiteId.equals(incoming.afterSiteId) ||
                     current.afterClock != incoming.afterClock) {
                 break;
             }
