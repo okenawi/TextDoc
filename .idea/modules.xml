@@ -2,6 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+      <module fileurl="file://$PROJECT_DIR$/BlockNode/BlockNode.iml" filepath="$PROJECT_DIR$/BlockNode/BlockNode.iml" />
       <module fileurl="file://$PROJECT_DIR$/TextDoc-demo.iml" filepath="$PROJECT_DIR$/TextDoc-demo.iml" />
     </modules>
   </component>

@@ -6,12 +6,12 @@ public class Main
         System.out.println("═══ TEST 1: New Document Has One Empty Block ═══");
         DocumentBlockCRDT docA = new DocumentBlockCRDT("A");
         DocumentBlockCRDT docB = new DocumentBlockCRDT("B");
-        docB.LocalDelete("B", 1);  // B is joining, remove auto-created first block
-        System.out.println("A: '" + docA.getVisibleText() + "'"); // one empty line
+        docB.LocalDelete("B", 1);  // B is joining, remove auto-created first block  /// ANA BAMS7OO 3SHAN E7NA 3AYZEN NBE2A NFS EL DATA 3AND A W B, F BAMS7 MN B AWL LINE EL ET3ML DAH 3SHAN A W B YEB2O 3ANDHM HWA AWL LINE EL GY MN A.
+        System.out.println("A: '" + docA.getVisibleText() + "'"); // one empty line   // getvisible text deh bttbt3 el hagat el visible bas el mt3mlhash delete.
 
 
         System.out.println("\n═══ TEST 2: Type Text Into First Block ═══");
-        BlockNode firstBlockA = docA.getBlock("A", 1);
+        BlockNode firstBlockA = docA.getBlock("A", 1);    // firstBlockA dah byshawr 3ala el block el cretaed asln inside docA fo2 w esmo"A"//
         CharacterNode h  = firstBlockA.content.localInsert('H', null, 0);
         CharacterNode e  = firstBlockA.content.localInsert('E', h.siteId,  h.clock);
         CharacterNode l1 = firstBlockA.content.localInsert('L', e.siteId,  e.clock);
@@ -43,13 +43,13 @@ public class Main
         blockFromA.content.localInsert('X', null, 0);
         blockFromB.content.localInsert('Y', null, 0);
         docA.remoteInsert(blockFromB);
-        docB.remoteInsert(blockFromA);
+        docB.remoteInsert(blockFromA); ///// hena el B yeksb b winsover 3shan hwa akbr alphabeticlly//
         System.out.println("A: " + docA.getVisibleText()); // must match B
         System.out.println("B: " + docB.getVisibleText()); // must match A
 
 
         System.out.println("\n═══ TEST 6: Delete a Block ═══");
-        docA.LocalDelete(secondBlockA.siteId, secondBlockA.clock);
+        docA.LocalDelete(secondBlockA.siteId, secondBlockA.clock);   /// el second block dah el hwa kan el satr bta3 world//
         docB.remoteDelete(secondBlockA.siteId, secondBlockA.clock);
         System.out.println("A: " + docA.getVisibleText()); // no WORLD
         System.out.println("B: " + docB.getVisibleText()); // must match A
@@ -66,12 +66,12 @@ public class Main
         docC.LocalDelete("C", 1);  // C is joining, remove auto-created first block
 
         // give C the base document first
-        docC.remoteInsert(firstBlockA);
-        docC.remoteInsert(secondBlockA);
+        docC.remoteInsert(firstBlockA);   // el hwa HELLO
+        docC.remoteInsert(secondBlockA);  // hena C byakhod el hagat el kanet mktoba abl ma hwa yegy//   el hwa world
 
         // give C the concurrent blocks from A and B BEFORE C inserts its own
-        docC.remoteInsert(blockFromA);
-        docC.remoteInsert(blockFromB);
+        docC.remoteInsert(blockFromA); //el hwa X
+        docC.remoteInsert(blockFromB); // el hwa Y
 
         // NOW C inserts its own block
         BlockNode blockFromC = docC.LocalInsert(firstBlockA.siteId, firstBlockA.clock);
@@ -81,9 +81,10 @@ public class Main
         docA.remoteInsert(blockFromC);
         docB.remoteInsert(blockFromC);
 
-        System.out.println("A: " + docA.getVisibleText()); // all must match
+        System.out.println("A: " + docA.getVisibleText()); // all must match     // C yeksb 3shan wins over btkhly el akbar alphaaa yktb el awl//
         System.out.println("B: " + docB.getVisibleText());
         System.out.println("C: " + docC.getVisibleText());
 
     }
 }
+    
