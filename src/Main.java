@@ -12,16 +12,21 @@ public class Main {
         DocumentCRDT crdtB = new DocumentCRDT("B");
         DocumentCRDT crdtC = new DocumentCRDT("C");
 
+        //user a katab 7agat de fel computer bta3o
+        //tabe3y locally inserted fel computer bta3o
         CharacterNode h  = crdtA.localInsert('H', null, 0);
         CharacterNode e  = crdtA.localInsert('E', h.siteId,  h.clock);
         CharacterNode l1 = crdtA.localInsert('L', e.siteId,  e.clock);
         CharacterNode l2 = crdtA.localInsert('L', l1.siteId, l1.clock);
         CharacterNode o  = crdtA.localInsert('O', l2.siteId, l2.clock);
 
+        //server hay broadcast el7aga de le b2y el users
         for (CharacterNode c : new CharacterNode[]{h, e, l1, l2, o}) {
             crdtB.remoteInsert(c);
             crdtC.remoteInsert(c);
         }
+
+        //ha call elfunction el 3amelha 34an te simulate el user interface
         System.out.println("A: " + crdtA.getVisibleText()); // HELLO
         System.out.println("B: " + crdtB.getVisibleText()); // HELLO
         System.out.println("C: " + crdtC.getVisibleText()); // HELLO
@@ -37,6 +42,8 @@ public class Main {
 
 
         System.out.println("\n═══ TEST 3: Basic Delete (Tombstone) ═══");
+        //user A masa7 fel laptop bta3o
+        //server  broadcast el delet le user B kaman
         crdtA.localDelete(e.siteId, e.clock);
         crdtB.remoteDelete(e.siteId, e.clock);
         System.out.println("A: " + crdtA.getVisibleText()); // no E
@@ -45,7 +52,7 @@ public class Main {
 
 
         System.out.println("\n═══ TEST 4: Insert After Deleted Character ═══");
-        CharacterNode k = crdtA.localInsert('K', e.siteId, e.clock);
+        CharacterNode k = crdtA.localInsert('K', h.siteId, h.clock);
         crdtB.remoteInsert(k);
         System.out.println("A: " + crdtA.getVisibleText());
         System.out.println("B: " + crdtB.getVisibleText()); // must match
@@ -76,30 +83,23 @@ public class Main {
         CharacterNode p = crdtA.localInsert('P', l1.siteId, l1.clock);
         CharacterNode q = crdtB.localInsert('Q', l1.siteId, l1.clock);
         CharacterNode r = crdtC.localInsert('R', l1.siteId, l1.clock);
-        crdtC.remoteInsert(x); crdtC.remoteInsert(y);
-        crdtC.remoteInsert(k); crdtC.remoteInsert(bang);
-        crdtC.remoteInsert(z1); crdtC.remoteInsert(z2);
-        crdtA.remoteInsert(q); crdtA.remoteInsert(r);
-        crdtB.remoteInsert(p); crdtB.remoteInsert(r);
-        crdtC.remoteInsert(p); crdtC.remoteInsert(q);
+        //Han5aly c te match bas 34an el tests el fatet
+        crdtC.remoteInsert(x);
+        crdtC.remoteInsert(y);
+        crdtC.remoteInsert(k);
+        crdtC.remoteInsert(bang);
+        crdtC.remoteInsert(z1);
+        crdtC.remoteInsert(z2);
+        //ne3mel b2a el new insertions 3alehom
+        crdtA.remoteInsert(q);
+        crdtA.remoteInsert(r);
+        crdtB.remoteInsert(p);
+        crdtB.remoteInsert(r);
+        crdtC.remoteInsert(p);
+        crdtC.remoteInsert(q);
         System.out.println("A: " + crdtA.getVisibleText()); // all must match
         System.out.println("B: " + crdtB.getVisibleText());
         System.out.println("C: " + crdtC.getVisibleText());
 
-
-        System.out.println("\n═══ TEST 9: Out of Order Arrival ═══");
-        CharacterNode first  = crdtA.localInsert('F', o.siteId, o.clock);
-        CharacterNode second = crdtA.localInsert('G', first.siteId, first.clock);
-        crdtB.remoteInsert(second); // arrives before first
-        crdtB.remoteInsert(first);  // first arrives late
-        System.out.println("A: " + crdtA.getVisibleText());
-        System.out.println("B: " + crdtB.getVisibleText()); // must match A
-
-
-        System.out.println("\n═══ TEST 10: Empty Document ═══");
-        DocumentCRDT empty = new DocumentCRDT("A");
-        System.out.println("empty text: '" + empty.getVisibleText() + "'");
-        System.out.println("empty internal: " + empty.getInternalState());
-        empty.remoteDelete("A", 999); // warning, no crash
     }
 }

@@ -56,7 +56,6 @@ public class DocumentCRDT  {
 
     // ─────────────────────────────────────────
     // LOCAL DELETE
-    // called when THIS user deletes a character
     //lama el user yedos delete in HIS document
     // ─────────────────────────────────────────
     public CharacterNode localDelete(String siteId, int clock) {
@@ -90,13 +89,13 @@ public class DocumentCRDT  {
 
             // there might already be other characters at position 0
             // we need to check tiebreaker against them
-            int insertAt = 0;//nemsek awel wa7da no3od nakrenhom bel incoming l7ad ma ala2y makanha
-            while (insertAt < characters.size() &&
-                    characters.get(insertAt).afterSiteId == null &&
-                    winsOver(characters.get(insertAt), incoming)) {
-                insertAt++;
+            int index = 0;//nemsek awel wa7da no3od nakrenhom bel incoming l7ad ma ala2y makanha
+            while (index < characters.size() &&
+                    characters.get(index).afterSiteId == null &&
+                    winsOver(characters.get(index), incoming)) {
+                index++;
             }
-            characters.add(insertAt, incoming);
+            characters.add(index, incoming);
             return;
         }
 
@@ -236,10 +235,6 @@ public class DocumentCRDT  {
     }
 
 
-    // ─────────────────────────────────────────
-    // APPLY FORMATTING
-    // toggles bold or italic on a character by id
-    // ─────────────────────────────────────────
     public void applyBold(String siteId, int clock, boolean value) {
         int index = findIndexById(siteId, clock);
         if (index != -1) {
