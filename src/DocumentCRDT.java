@@ -76,6 +76,11 @@ public class DocumentCRDT  {
     // called when we receive an insert op from another user
     // also called internally by localInsert
     // ─────────────────────────────────────────
+    // ─────────────────────────────────────────
+    // REMOTE INSERT
+    // called when we receive an insert op from another user
+    // also called internally by localInsert
+    // ─────────────────────────────────────────
     public void remoteInsert(CharacterNode incoming) {
 
         // update our clock to stay in sync with the network
@@ -124,7 +129,8 @@ public class DocumentCRDT  {
 
             // stop if this character points to a DIFFERENT afterId
             // meaning it belongs to a different part of the document
-            if (!current.afterSiteId.equals(incoming.afterSiteId) ||
+            // ✅ FIX APPLIED HERE:
+            if (!java.util.Objects.equals(current.afterSiteId, incoming.afterSiteId) ||
                     current.afterClock != incoming.afterClock) {
                 break;
             }
@@ -143,6 +149,7 @@ public class DocumentCRDT  {
         // step 4: insert at the found position
         characters.add(insertAt, incoming);
     }
+
 
 
     // ─────────────────────────────────────────
@@ -205,11 +212,11 @@ public class DocumentCRDT  {
     }
 
 
-    // ─────────────────────────────────────────
+
     // GET VISIBLE TEXT
     // returns only non-deleted characters as a string
     // this is what gets displayed in the UI
-    // ─────────────────────────────────────────
+
     public String getVisibleText() {
         StringBuilder sb = new StringBuilder();
         for (CharacterNode c : characters) {
@@ -221,11 +228,26 @@ public class DocumentCRDT  {
     }
 
 
-    // ─────────────────────────────────────────
+    // GET VISIBLE NODE AT INDEX (UI Helper)
+    // Translates a UI cursor index into the actual CharacterNode
+
+    public CharacterNode getVisibleNodeAt(int visibleIndex) {
+        if (visibleIndex < 0) return null;
+
+        int count = 0;
+        for (CharacterNode c : characters) {
+            if (!c.isDeleted) { // Only count characters that the UI can actually see
+                if (count == visibleIndex) return c;
+                count++;
+            }
+        }
+        return null;
+    }
+
     // GET INTERNAL STATE
     // shows the full list including tombstones
     // only for debugging
-    // ─────────────────────────────────────────
+
     public String getInternalState() {
         StringBuilder sb = new StringBuilder();
         for (CharacterNode c : characters) {
@@ -236,10 +258,10 @@ public class DocumentCRDT  {
     }
 
 
-    // ─────────────────────────────────────────
+
     // APPLY FORMATTING
     // toggles bold or italic on a character by id
-    // ─────────────────────────────────────────
+
     public void applyBold(String siteId, int clock, boolean value) {
         int index = findIndexById(siteId, clock);
         if (index != -1) {

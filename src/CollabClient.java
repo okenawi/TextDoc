@@ -18,12 +18,12 @@ public class CollabClient extends WebSocketClient {
 
     @Override
     public void onOpen(ServerHandshake handshakeData) {
-        System.out.println("🟢 CLIENT: Successfully connected to the server!");
+        System.out.println("CLIENT: Successfully connected to the server!");
     }
 
     @Override
     public void onMessage(String message) {
-        System.out.println("📩 CLIENT RECEIVED: " + message);
+        System.out.println("CLIENT RECEIVED: " + message);
 
         // When a message arrives, send it through the wire to Main.java!
         if (onMessageCallback != null) {
@@ -33,12 +33,12 @@ public class CollabClient extends WebSocketClient {
 
     @Override
     public void onClose(int code, String reason, boolean remote) {
-        System.out.println("🔴 CLIENT: Disconnected from server. Reason: " + reason);
+        System.out.println("CLIENT: Disconnected from server. Reason: " + reason);
     }
 
     @Override
     public void onError(Exception ex) {
-        System.err.println("⚠️ CLIENT ERROR!");
+        System.err.println("CLIENT ERROR!");
         ex.printStackTrace();
     }
 }

@@ -21,20 +21,20 @@ public class CollabServer extends WebSocketServer {
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
         activeConnections.add(conn);
-        System.out.println("🟢 NEW CONNECTION: " + conn.getRemoteSocketAddress());
+        System.out.println("NEW CONNECTION: " + conn.getRemoteSocketAddress());
         System.out.println("Total active users: " + activeConnections.size());
     }
 
     @Override
     public void onClose(WebSocket conn, int code, String reason, boolean remote) {
         activeConnections.remove(conn);
-        System.out.println("🔴 DISCONNECTED: " + conn.getRemoteSocketAddress());
+        System.out.println("DISCONNECTED: " + conn.getRemoteSocketAddress());
         System.out.println("Total active users: " + activeConnections.size());
     }
 
     @Override
     public void onMessage(WebSocket conn, String message) {
-        System.out.println("📩 RECEIVED from " + conn.getRemoteSocketAddress() + ": " + message);
+        System.out.println("RECEIVED from " + conn.getRemoteSocketAddress() + ": " + message);
 
         // BROADCAST: Send the message to all clients EXCEPT the one who sent it
         // (The sender already updated their own UI locally, so they don't need it echoed back)
@@ -49,14 +49,14 @@ public class CollabServer extends WebSocketServer {
 
     @Override
     public void onError(WebSocket conn, Exception ex) {
-        System.err.println("⚠️ ERROR on connection " + (conn != null ? conn.getRemoteSocketAddress() : "null"));
+        System.err.println("ERROR on connection " + (conn != null ? conn.getRemoteSocketAddress() : "null"));
         ex.printStackTrace();
     }
 
     @Override
     public void onStart() {
         System.out.println("Server Started");
-        System.out.println("Listening for WebSocket connections on port: " + getPort());
+        System.out.println("Listening for connections on port: " + getPort());
     }
 
     // Main method to run the server standalone
