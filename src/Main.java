@@ -252,7 +252,6 @@ public class Main extends Application {
         root.setStyle(bg(C_BG));
         root.setTop(buildEditorTop());
         root.setCenter(buildEditorCenter());
-        root.setBottom(buildEditorFooter());
         primaryStage.setScene(new Scene(root));
     }
 
@@ -489,43 +488,6 @@ public class Main extends Application {
         return center;
     }
 
-    // Editor footer
-    private HBox buildEditorFooter() {
-        HBox bar = new HBox();
-        bar.setStyle(bg(C_SURFACE_HIGH));
-        bar.setPadding(new Insets(6, 24, 6, 24));
-        bar.setAlignment(Pos.CENTER_LEFT);
-
-        Label statusHdr = new Label("STATUS");
-        statusHdr.setStyle(fg(C_ON_SURFACE_VAR) + "-fx-font-size:8px;-fx-font-weight:bold;-fx-opacity:0.4;");
-        Label idleLbl = new Label("Idle");
-        idleLbl.setStyle(fg(C_ON_SURFACE_VAR) + "-fx-font-size:11px;");
-
-        Label syncHdr = new Label("SYNC");
-        syncHdr.setStyle(fg(C_ON_SURFACE_VAR) + "-fx-font-size:8px;-fx-font-weight:bold;-fx-opacity:0.4;");
-        Label cloudIcon = new Label("☁");
-        cloudIcon.setStyle(fg(C_PRIMARY) + "-fx-font-size:13px;");
-
-        HBox leftGroup = new HBox(16,
-                new HBox(6, statusHdr, idleLbl),
-                new HBox(4, syncHdr, cloudIcon));
-        leftGroup.setAlignment(Pos.CENTER_LEFT);
-        ((HBox) leftGroup.getChildren().get(0)).setAlignment(Pos.CENTER_LEFT);
-        ((HBox) leftGroup.getChildren().get(1)).setAlignment(Pos.CENTER_LEFT);
-
-        Region sp = new Region(); HBox.setHgrow(sp, Priority.ALWAYS);
-
-        HBox rightGroup = new HBox(16);
-        rightGroup.setAlignment(Pos.CENTER_RIGHT);
-        for (String t : new String[]{"UTF-8", "LF", "Master"}) {
-            Label l = new Label(t);
-            l.setStyle(fg(C_ON_SURFACE_VAR) + "-fx-font-size:11px;-fx-opacity:0.6;");
-            rightGroup.getChildren().add(l);
-        }
-
-        bar.getChildren().addAll(leftGroup, sp, rightGroup);
-        return bar;
-    }
 
     // =========================================================================
     //  SHARED COMPONENT BUILDERS
