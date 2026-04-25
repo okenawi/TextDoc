@@ -14,6 +14,7 @@ import javafx.scene.input.KeyCode;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import javafx.application.Platform;
+import javafx.scene.media.AudioClip;
 
 /**
  * TextDoc - Two-screen JavaFX app
@@ -265,6 +266,8 @@ public class Main extends Application {
 
         Label logo = new Label("TextDoc");
         logo.setStyle(fg(C_ON_SURFACE) + "-fx-font-size:18px;-fx-font-weight:bold;");
+        logo.setCursor(Cursor.HAND);
+        logo.setOnMouseClicked(e -> playSound());
 
         Rectangle divLine = new Rectangle(1, 16, Color.web(C_OUTLINE_VAR));
         divLine.setOpacity(0.3);
@@ -550,7 +553,15 @@ public class Main extends Application {
         field.getChildren().addAll(lbl, tf);
         return field;
     }
-
+    private void playSound() {
+        try {
+            String soundPath = getClass().getResource("/Perfect.wav").toExternalForm();
+            AudioClip clip = new AudioClip(soundPath);
+            clip.play();
+        } catch (Exception e) {
+            System.err.println("Could not find sound file");
+        }
+    }
 
     private HBox userRow(String initials, String name, String role, boolean active) {
         HBox row = new HBox(12);
