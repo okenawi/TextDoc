@@ -66,6 +66,7 @@ public class Main extends Application {
         // Platform.runLater forces this code to run on the main UI thread so JavaFX doesn't crash!
         Platform.runLater(() -> {
             try {
+
                 Gson gson = new Gson();
                 // Turn the raw string into a flexible JSON Object
                 JsonObject op = gson.fromJson(jsonMessage, JsonObject.class);
@@ -113,6 +114,25 @@ public class Main extends Application {
                 // 5. Update the screen and place the cursor in the mathematically correct spot
                 editor.setText(myCrdt.getVisibleText());
                 editor.positionCaret(newCursorIndex);
+
+                String types = op.get("type").getAsString();
+
+                if (types.equals("USER_JOINED")) {
+                    String newUserId = op.get("userId").getAsString();
+                    connectedUsers.put(newUserId, new RemoteUser(newUserId, "User-" + newUserId.substring(0,4)));
+                    refreshUserList();
+                    return; // Don't process CRDT logic for this message
+                }
+
+                if (types.equals("USER_LEFT")) {
+                    String leftUserId = op.get("userId").getAsString();
+                    connectedUsers.remove(leftUserId);
+                    refreshUserList();
+                    return;
+                }
+
+                // ... (your existing INSERT/DELETE code follows) ...
+
 
             } catch (Exception e) {
                 System.err.println("Failed to parse incoming JSON: " + jsonMessage);
@@ -518,6 +538,13 @@ public class Main extends Application {
         VBox userList = new VBox(2);
         VBox.setVgrow(userList, Priority.ALWAYS);
 
+        // Link our global variable to this UI component
+        this.userListContainer = userList;
+
+        refreshUserList(); // Initial draw
+
+
+
 
         userList.getChildren().addAll(
                 userRow(myUserId.substring(5), myUserId + " (You)", "Lead Editor", true)
@@ -684,4 +711,30 @@ public class Main extends Application {
     private CollabClient webSocketClient;
     private TextArea editor;
     public static void main(String[] args) { launch(args); }
+    // Simple helper to track remote users
+    public static class RemoteUser {
+        String id;
+        String name;
+        public RemoteUser(String id, String name) { this.id = id; this.name = name; }
+    }
+    private java.util.Map<String, RemoteUser> connectedUsers = new java.util.HashMap<>();
+    private VBox userListContainer; // We'll link this to the UI
+
+    private void refreshUserList() {
+        Platform.runLater(() -> {
+            userListContainer.getChildren().clear();
+
+            // 1. Always add yourself first
+            userListContainer.getChildren().add(
+                    userRow(myUserId.substring(0, 2), myUserId + " (You)", "Lead Editor", true)
+            );
+
+            // 2. Add everyone else
+            for (RemoteUser u : connectedUsers.values()) {
+                userListContainer.getChildren().add(
+                        userRow(u.name.substring(0, 2), u.name, "Editor", false)
+                );
+            }
+        });
+    }
 }
