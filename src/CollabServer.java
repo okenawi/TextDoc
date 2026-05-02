@@ -1,7 +1,6 @@
 import org.java_websocket.server.WebSocketServer;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
-
 import java.net.InetSocketAddress;
 import java.util.Collections;
 import java.util.HashSet;

@@ -361,6 +361,8 @@ public class Main extends Application {
         // 1. INTERCEPT TYPING
         editor.addEventFilter(KeyEvent.KEY_TYPED, event -> {
             String characterStr = event.getCharacter();
+
+            // Block empty characters AND control keys (like Enter). We handle Enter in KEY_PRESSED!
             if (characterStr.isEmpty() || characterStr.charAt(0) < 32) return;
 
             int cursorIndex = editor.getCaretPosition();
@@ -380,14 +382,22 @@ public class Main extends Application {
             // 1. Update local CRDT and get the new Node
             CharacterNode newNode = myCrdt.localInsert(letter, afterSiteId, afterClock);
 
-            // 2. Format the operation as a JSON String
+            // 2. Safely escape quotes and backslashes for JSON!
+            String safeValue = String.valueOf(newNode.value);
+            if (newNode.value == '\\') {
+                safeValue = "\\\\";
+            } else if (newNode.value == '"') {
+                safeValue = "\\\"";
+            }
+
+            // 3. Format the operation as a JSON String
             String afterIdJson = (newNode.afterSiteId == null) ? "null" : "\"" + newNode.afterSiteId + "\"";
             String insertMessage = String.format(
                     "{\"type\": \"INSERT\", \"siteId\": \"%s\", \"clock\": %d, \"value\": \"%s\", \"afterSiteId\": %s, \"afterClock\": %d}",
-                    newNode.siteId, newNode.clock, newNode.value, afterIdJson, newNode.afterClock
+                    newNode.siteId, newNode.clock, safeValue, afterIdJson, newNode.afterClock
             );
 
-            // 3. Send it to the server!
+            // 4. Send it to the server!
             if (webSocketClient != null && webSocketClient.isOpen()) {
                 webSocketClient.send(insertMessage);
             }
@@ -398,9 +408,44 @@ public class Main extends Application {
             editor.positionCaret(cursorIndex + 1);
         });
 
-        // 2. INTERCEPT DELETING
+        // 2. INTERCEPT SPECIAL KEYS (Enter & Backspace)
         editor.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
-            if (event.getCode() == KeyCode.BACK_SPACE) {
+
+            // --- NEW ENTER LOGIC ---
+            if (event.getCode() == KeyCode.ENTER) {
+                int cursorIndex = editor.getCaretPosition();
+                String afterSiteId = null;
+                int afterClock = 0;
+
+                if (cursorIndex > 0) {
+                    CharacterNode prevNode = myCrdt.getVisibleNodeAt(cursorIndex - 1);
+                    if (prevNode != null) {
+                        afterSiteId = prevNode.siteId;
+                        afterClock = prevNode.clock;
+                    }
+                }
+
+                // 1. Hardcode the newline insertion into the CRDT
+                CharacterNode newNode = myCrdt.localInsert('\n', afterSiteId, afterClock);
+
+                // 2. Format the JSON (passing "\\n" so it safely escapes over the network)
+                String afterIdJson = (newNode.afterSiteId == null) ? "null" : "\"" + newNode.afterSiteId + "\"";
+                String insertMessage = String.format(
+                        "{\"type\": \"INSERT\", \"siteId\": \"%s\", \"clock\": %d, \"value\": \"%s\", \"afterSiteId\": %s, \"afterClock\": %d}",
+                        newNode.siteId, newNode.clock, "\\n", afterIdJson, newNode.afterClock
+                );
+
+                if (webSocketClient != null && webSocketClient.isOpen()) {
+                    webSocketClient.send(insertMessage);
+                }
+
+                // 3. Stop JavaFX default behavior and redraw correctly
+                event.consume();
+                editor.setText(myCrdt.getVisibleText());
+                editor.positionCaret(cursorIndex + 1);
+
+                // --- EXISTING BACKSPACE LOGIC ---
+            } else if (event.getCode() == KeyCode.BACK_SPACE) {
                 int cursorIndex = editor.getCaretPosition();
 
                 if (cursorIndex > 0) {
@@ -428,6 +473,7 @@ public class Main extends Application {
                 }
             }
         });
+
         // =========================================================
         //  END OF CRDT INTEGRATION
         // =========================================================
