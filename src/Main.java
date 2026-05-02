@@ -61,31 +61,45 @@ public class Main extends Application {
     // HANDLE REMOTE OPERATION
     // Takes JSON from the WebSocket and updates the UI
     public void handleRemoteOperation(String jsonMessage) {
-
-        // CRITICAL: WebSockets run in the background.
-        // Platform.runLater forces this code to run on the main UI thread so JavaFX doesn't crash!
         Platform.runLater(() -> {
             try {
-
                 Gson gson = new Gson();
-                // Turn the raw string into a flexible JSON Object
                 JsonObject op = gson.fromJson(jsonMessage, JsonObject.class);
-
                 String type = op.get("type").getAsString();
+
+                // 1. Handle Meta-Messages First (Users joining/leaving)
+                if (type.equals("USER_JOINED")) {
+                    String newUserId = op.get("userId").getAsString();
+                    connectedUsers.put(newUserId, new RemoteUser(newUserId, "User-" + newUserId.substring(0,2)));
+                    refreshUserList();
+                    return;
+                }
+
+                if (type.equals("USER_LEFT")) {
+                    String leftUserId = op.get("userId").getAsString();
+                    connectedUsers.remove(leftUserId);
+                    refreshUserList();
+                    return;
+                }
+
+                // 2. Handle Document-Messages (Insert/Delete)
                 String siteId = op.get("siteId").getAsString();
+                // ====================================================
+                // NEW: AUTO-DISCOVERY
+                // If a user types and we don't know them, add them to the sidebar!
+                if (!siteId.equals(myUserId) && !connectedUsers.containsKey(siteId)) {
+                    connectedUsers.put(siteId, new RemoteUser(siteId, siteId));
+                    refreshUserList(); // Redraw the UI
+                }
+                // ====================================================
                 int clock = op.get("clock").getAsInt();
 
                 if (type.equals("INSERT")) {
                     char value = op.get("value").getAsString().charAt(0);
-
-                    // Safely handle the afterSiteId (since the first character is null)
-                    String afterSiteId = null;
-                    if (op.has("afterSiteId") && !op.get("afterSiteId").isJsonNull()) {
-                        afterSiteId = op.get("afterSiteId").getAsString();
-                    }
+                    String afterSiteId = (op.has("afterSiteId") && !op.get("afterSiteId").isJsonNull())
+                            ? op.get("afterSiteId").getAsString() : null;
                     int afterClock = op.get("afterClock").getAsInt();
 
-                    // Rebuild the Node and feed it to the CRDT
                     CharacterNode incomingNode = new CharacterNode(siteId, clock, value, afterSiteId, afterClock);
                     myCrdt.remoteInsert(incomingNode);
 
@@ -93,50 +107,21 @@ public class Main extends Application {
                     myCrdt.remoteDelete(siteId, clock);
                 }
 
-                // 1. Save where our local cursor currently is
+                // 3. Update Cursor and UI
                 int oldCursorIndex = editor.getCaretPosition();
                 int newCursorIndex = oldCursorIndex;
-
-                // 2. Ask the CRDT exactly where it just placed the remote letter/deletion
                 int remoteChangeIndex = myCrdt.getVisibleIndex(siteId, clock);
 
                 if (remoteChangeIndex != -1) {
-                    // 3. Shift local cursor RIGHT if they inserted text behind us
-                    if (type.equals("INSERT") && remoteChangeIndex <= oldCursorIndex) {
-                        newCursorIndex++;
-                    }
-                    // 4. Shift local cursor LEFT if they deleted text behind us
-                    else if (type.equals("DELETE") && remoteChangeIndex < oldCursorIndex) {
-                        newCursorIndex--;
-                    }
+                    if (type.equals("INSERT") && remoteChangeIndex <= oldCursorIndex) newCursorIndex++;
+                    else if (type.equals("DELETE") && remoteChangeIndex < oldCursorIndex) newCursorIndex--;
                 }
 
-                // 5. Update the screen and place the cursor in the mathematically correct spot
                 editor.setText(myCrdt.getVisibleText());
                 editor.positionCaret(newCursorIndex);
 
-                String types = op.get("type").getAsString();
-
-                if (types.equals("USER_JOINED")) {
-                    String newUserId = op.get("userId").getAsString();
-                    connectedUsers.put(newUserId, new RemoteUser(newUserId, "User-" + newUserId.substring(0,4)));
-                    refreshUserList();
-                    return; // Don't process CRDT logic for this message
-                }
-
-                if (types.equals("USER_LEFT")) {
-                    String leftUserId = op.get("userId").getAsString();
-                    connectedUsers.remove(leftUserId);
-                    refreshUserList();
-                    return;
-                }
-
-                // ... (your existing INSERT/DELETE code follows) ...
-
-
             } catch (Exception e) {
-                System.err.println("Failed to parse incoming JSON: " + jsonMessage);
-                e.printStackTrace();
+                System.err.println("JSON Error: " + e.getMessage());
             }
         });
     }
@@ -538,17 +523,13 @@ public class Main extends Application {
         VBox userList = new VBox(2);
         VBox.setVgrow(userList, Priority.ALWAYS);
 
-        // Link our global variable to this UI component
+        // 1. Link the global variable so handleRemoteOperation knows where to draw
         this.userListContainer = userList;
 
-        refreshUserList(); // Initial draw
+        // 2. This method clears the list and adds "You" (and any remote users)
+        refreshUserList();
 
-
-
-
-        userList.getChildren().addAll(
-                userRow(myUserId.substring(5), myUserId + " (You)", "Lead Editor", true)
-        );
+        // 3. (DELETED the manual addAll block that was here)
 
         // bottom of sidebar
         VBox bottomActions = new VBox(0);
@@ -722,18 +703,18 @@ public class Main extends Application {
 
     private void refreshUserList() {
         Platform.runLater(() -> {
+            if (userListContainer == null) return; // Safety check
+
             userListContainer.getChildren().clear();
 
-            // 1. Always add yourself first
-            userListContainer.getChildren().add(
-                    userRow(myUserId.substring(0, 2), myUserId + " (You)", "Lead Editor", true)
-            );
+            // 1. Draw "YOU"
+            String initials = myUserId.length() > 2 ? myUserId.substring(0, 2) : myUserId;
+            userListContainer.getChildren().add(userRow(initials, myUserId + " (You)", "Lead Editor", true));
 
-            // 2. Add everyone else
+            // 2. Draw EVERYONE ELSE in the connectedUsers map
             for (RemoteUser u : connectedUsers.values()) {
-                userListContainer.getChildren().add(
-                        userRow(u.name.substring(0, 2), u.name, "Editor", false)
-                );
+                String uInitials = u.name.length() > 2 ? u.name.substring(0, 2) : u.name;
+                userListContainer.getChildren().add(userRow(uInitials, u.name, "Editor", false));
             }
         });
     }
