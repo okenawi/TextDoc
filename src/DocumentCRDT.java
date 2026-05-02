@@ -275,4 +275,24 @@ public class DocumentCRDT  {
             characters.get(index).isItalic = value;
         }
     }
+    // ─────────────────────────────────────────
+    // GET VISIBLE INDEX (UI Helper)
+    // Finds where a character physically sits on the screen (ignoring tombstones).
+    // We need this to shift the local cursor when remote users type!
+    // ─────────────────────────────────────────
+    public int getVisibleIndex(String siteId, int clock) {
+        int visibleCount = 0;
+        for (CharacterNode c : characters) {
+            // If we found the exact character, return the current visible count
+            if (c.hasSameId(siteId, clock)) {
+                return visibleCount;
+            }
+            // Only increment the index counter if the character is actually on screen
+            if (!c.isDeleted) {
+                visibleCount++;
+            }
+        }
+        return -1; // Not found
+    }
 }
+

@@ -92,10 +92,27 @@ public class Main extends Application {
                     myCrdt.remoteDelete(siteId, clock);
                 }
 
-                // Force the screen to update and match the new CRDT state
-                int cursorIndex = editor.getCaretPosition();
+                // 1. Save where our local cursor currently is
+                int oldCursorIndex = editor.getCaretPosition();
+                int newCursorIndex = oldCursorIndex;
+
+                // 2. Ask the CRDT exactly where it just placed the remote letter/deletion
+                int remoteChangeIndex = myCrdt.getVisibleIndex(siteId, clock);
+
+                if (remoteChangeIndex != -1) {
+                    // 3. Shift local cursor RIGHT if they inserted text behind us
+                    if (type.equals("INSERT") && remoteChangeIndex <= oldCursorIndex) {
+                        newCursorIndex++;
+                    }
+                    // 4. Shift local cursor LEFT if they deleted text behind us
+                    else if (type.equals("DELETE") && remoteChangeIndex < oldCursorIndex) {
+                        newCursorIndex--;
+                    }
+                }
+
+                // 5. Update the screen and place the cursor in the mathematically correct spot
                 editor.setText(myCrdt.getVisibleText());
-                editor.positionCaret(cursorIndex);
+                editor.positionCaret(newCursorIndex);
 
             } catch (Exception e) {
                 System.err.println("Failed to parse incoming JSON: " + jsonMessage);
