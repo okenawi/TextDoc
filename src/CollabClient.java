@@ -5,7 +5,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.function.Consumer;
 
-public class CollabClient extends WebSocketClient {
+public class    CollabClient extends WebSocketClient {
 
     // This is the "wire" that connects the network back to your Main UI
     private Consumer<String> onMessageCallback;
