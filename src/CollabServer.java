@@ -34,6 +34,26 @@ public class CollabServer extends WebSocketServer {
         System.out.println("NEW CONNECTION: " + conn.getRemoteSocketAddress());
         System.out.println("Total active users: " + activeConnections.size());
 
+        // Send the full operation history to the newly connected client
+        // so their document is immediately up to date
+        try {
+            // ⚠️ This must match whatever documentId you're using when saving.
+            // Right now we're using "default" as a shared document ID for everyone.
+            String documentId = "default";
+            List<String> history = OperationRepository.getOperations(documentId);
+
+            System.out.println("📦 Sending " + history.size() + " operations to new client...");
+
+            for (String op : history) {
+                conn.send(op);
+            }
+
+            System.out.println("✅ History sent to: " + conn.getRemoteSocketAddress());
+
+        } catch (Exception e) {
+            System.err.println("❌ Failed to send history: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -57,7 +77,7 @@ public class CollabServer extends WebSocketServer {
 
             // For now use siteId as documentId — you can change this later
             // when you add real document/room management
-            String documentId = siteId;
+            String documentId = "default";
 
             String value = (json.has("value") && !json.get("value").isJsonNull())
                     ? json.get("value").getAsString() : null;
