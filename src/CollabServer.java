@@ -5,6 +5,17 @@ import java.net.InetSocketAddress;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import javafx.animation.*;
+import javafx.geometry.*;
+import javafx.scene.*;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.scene.shape.*;
+import javafx.scene.text.*;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import java.util.List;
+
 
 public class CollabServer extends WebSocketServer {
 
@@ -22,6 +33,7 @@ public class CollabServer extends WebSocketServer {
         activeConnections.add(conn);
         System.out.println("NEW CONNECTION: " + conn.getRemoteSocketAddress());
         System.out.println("Total active users: " + activeConnections.size());
+
     }
 
     @Override
@@ -35,8 +47,44 @@ public class CollabServer extends WebSocketServer {
     public void onMessage(WebSocket conn, String message) {
         System.out.println("RECEIVED from " + conn.getRemoteSocketAddress() + ": " + message);
 
-        // BROADCAST: Send the message to all clients EXCEPT the one who sent it
-        // (The sender already updated their own UI locally, so they don't need it echoed back)
+        try {
+            Gson gson = new Gson();
+            JsonObject json = gson.fromJson(message, JsonObject.class);
+
+            String type       = json.get("type").getAsString();
+            String siteId     = json.get("siteId").getAsString();
+            int    clock      = json.get("clock").getAsInt();
+
+            // For now use siteId as documentId — you can change this later
+            // when you add real document/room management
+            String documentId = siteId;
+
+            String value = (json.has("value") && !json.get("value").isJsonNull())
+                    ? json.get("value").getAsString() : null;
+
+            String afterSiteId = (json.has("afterSiteId") && !json.get("afterSiteId").isJsonNull())
+                    ? json.get("afterSiteId").getAsString() : null;
+
+            int afterClock = json.has("afterClock") ? json.get("afterClock").getAsInt() : 0;
+
+            boolean isBold   = json.has("isBold")   && json.get("isBold").getAsBoolean();
+            boolean isItalic = json.has("isItalic") && json.get("isItalic").getAsBoolean();
+
+            // ✅ Save to MongoDB
+            OperationRepository.saveOperation(
+                    documentId, type, siteId, clock,
+                    value, afterSiteId, afterClock,
+                    isBold, isItalic
+            );
+
+            System.out.println("✅ Saved to MongoDB: " + type + " by " + siteId);
+
+        } catch (Exception e) {
+            System.err.println("❌ Failed to save to MongoDB: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        // Broadcast to all other clients
         synchronized (activeConnections) {
             for (WebSocket client : activeConnections) {
                 if (client != conn && client.isOpen()) {
@@ -56,6 +104,8 @@ public class CollabServer extends WebSocketServer {
     public void onStart() {
         System.out.println("Server Started");
         System.out.println("Listening for connections on port: " + getPort());
+        Database.initialize();
+
     }
 
     // Main method to run the server standalone
@@ -66,3 +116,6 @@ public class CollabServer extends WebSocketServer {
         // The server runs on its own thread, so it won't block the rest of your app
     }
 }
+
+
+

@@ -6,6 +6,7 @@
       <root url="jar://$PROJECT_DIR$/../../mongodb-driver-core-4.11.5.jar!/" />
       <root url="jar://$PROJECT_DIR$/../../mongodb-driver-sync-4.11.5.jar!/" />
       <root url="jar://$PROJECT_DIR$/../../bson-4.11.5.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../../gson-2.11.0.jar!/" />
     </CLASSES>
     <JAVADOC />
     <SOURCES />
