@@ -269,6 +269,14 @@ public class Main extends Application {
         panel.getChildren().addAll(hello, sub, form, connectBtn);
         connectBtn.setOnAction(e -> {
             try {
+                // ✅ Close old connection if one exists
+                if (webSocketClient != null && webSocketClient.isOpen()) {
+                    webSocketClient.close();
+                }
+
+                // ✅ Wipe old session state before building the new screen
+                resetSession();
+
                 String targetServer = serverAddressInput.getText();
                 System.out.println("Attempting to connect to: " + targetServer);
 
@@ -894,7 +902,14 @@ public class Main extends Application {
         row.getChildren().addAll(iconLbl, textLbl);
         return row;
     }
-
+    private void resetSession() {
+        myUserId = "User-" + java.util.UUID.randomUUID().toString().substring(0, 4).toUpperCase();
+        myCrdt = new DocumentCRDT(myUserId);
+        connectedUsers.clear();
+        editor = null;
+        boldActive = false;
+        italicActive = false;
+    }
     // =========================================================================
     //  FIELDS
     // =========================================================================
