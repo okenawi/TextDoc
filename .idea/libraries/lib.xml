@@ -1,15 +1,10 @@
 <component name="libraryTable">
   <library name="lib">
     <CLASSES>
-      <root url="file://E:/Uni/APT/openjfx-26_windows-x64_bin-sdk/openjfx-26_windows-x64_bin-sdk/javafx-sdk-26/lib" />
-      <root url="jar://$PROJECT_DIR$/../../mongodb-driver-legacy-4.11.5.jar!/" />
-      <root url="jar://$PROJECT_DIR$/../../mongodb-driver-core-4.11.5.jar!/" />
-      <root url="jar://$PROJECT_DIR$/../../mongodb-driver-sync-4.11.5.jar!/" />
-      <root url="jar://$PROJECT_DIR$/../../bson-4.11.5.jar!/" />
-      <root url="jar://$PROJECT_DIR$/../../gson-2.11.0.jar!/" />
+      <root url="file://$USER_HOME$/Downloads/openjfx-26_windows-x64_bin-sdk/openjfx-26_windows-x64_bin-sdk/javafx-sdk-26/lib" />
     </CLASSES>
     <JAVADOC />
     <SOURCES />
-    <jarDirectory url="file://E:/Uni/APT/openjfx-26_windows-x64_bin-sdk/openjfx-26_windows-x64_bin-sdk/javafx-sdk-26/lib" recursive="false" />
+    <jarDirectory url="file://$USER_HOME$/Downloads/openjfx-26_windows-x64_bin-sdk/openjfx-26_windows-x64_bin-sdk/javafx-sdk-26/lib" recursive="false" />
   </library>
 </component>

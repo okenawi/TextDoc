@@ -16,17 +16,29 @@ import com.google.gson.JsonObject;
 import javafx.application.Platform;
 import javafx.scene.media.AudioClip;
 
+// ── RichTextFX ────────────────────────────────────────────────────────────────
+// Requires richtextfx-fat-0.11.2.jar on the classpath.
+// Fat JAR already bundles ReactFX, UndoFX, and Flowless — no extra JARs needed.
+import org.fxmisc.richtext.InlineCssTextArea;
+import org.fxmisc.flowless.VirtualizedScrollPane;
+import java.util.List;
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
  * TextDoc - Two-screen JavaFX app
  *  Screen 1: Welcome / Connect
  *  Screen 2: Collaborative Editor  ← opens when "Start New Project" is clicked
  *
  * VM options:
- *   --module-path "G:\openjfx-26_windows-x64_bin-sdk\javafx-sdk-26\lib" --add-modules javafx.controls,javafx.graphics,javafx.base
+ *   --module-path "G:\openjfx-26_windows-x64_bin-sdk\javafx-sdk-26\lib"
+ *   --add-modules javafx.controls,javafx.graphics,javafx.base,javafx.media
+ *
+ * Classpath additions vs the plain-TextArea version:
+ *   richtextfx-fat-0.11.2.jar
  */
 public class Main extends Application {
 
-    // Colour palette
+    // ── Colour palette ────────────────────────────────────────────────────────
     private static final String C_BG                 = "#f7fafc";
     private static final String C_SURFACE_LOW        = "#eff4f7";
     private static final String C_SURFACE_HIGH       = "#dfeaef";
@@ -43,10 +55,47 @@ public class Main extends Application {
     private static final String C_ERROR              = "#9f403d";
     private static final String C_ERROR_CONTAINER    = "#fe8983";
 
+    // ── Base inline-CSS applied to every character in the rich-text area.
+    //    RichTextFX uses -fx-fill (not -fx-text-fill) for text colour.
+    private static final String CHAR_BASE_CSS =
+            "-fx-font-family: 'Courier New'; -fx-font-size: 14px; -fx-fill: " + C_ON_SURFACE + ";";
+
     private Stage primaryStage;
 
     private static String bg(String h) { return "-fx-background-color:" + h + ";"; }
     private static String fg(String h) { return "-fx-text-fill:" + h + ";"; }
+
+    // ── Build the inline-CSS string for one character ─────────────────────────
+    // =========================================================================
+    //  RICHTEXTFX CSS HELPER
+    // =========================================================================
+    /**
+     * Generates the inline CSS string for a specific character based on its CRDT state.
+     */
+    private String charCss(boolean isBold, boolean isItalic) {
+        StringBuilder css = new StringBuilder();
+
+        // Base text styling
+        css.append("-fx-fill: ").append(C_ON_SURFACE).append("; ");
+        css.append("-fx-font-family: 'System'; ");
+        css.append("-fx-font-size: 15px; ");
+
+        // Add Bold
+        if (isBold) {
+            css.append("-fx-font-weight: bold; ");
+        } else {
+            css.append("-fx-font-weight: normal; ");
+        }
+
+        // Add Italic
+        if (isItalic) {
+            css.append("-fx-font-style: italic; ");
+        } else {
+            css.append("-fx-font-style: normal; ");
+        }
+
+        return css.toString();
+    }
 
     @Override
     public void start(Stage stage) {
@@ -58,8 +107,10 @@ public class Main extends Application {
         stage.show();
     }
 
-    // HANDLE REMOTE OPERATION
-    // Takes JSON from the WebSocket and updates the UI
+    // =========================================================================
+    //  HANDLE REMOTE OPERATION
+    //  Takes JSON from the WebSocket and updates the CRDT + UI
+    // =========================================================================
     public void handleRemoteOperation(String jsonMessage) {
         Platform.runLater(() -> {
             try {
@@ -70,7 +121,7 @@ public class Main extends Application {
                 // 1. Handle Meta-Messages First (Users joining/leaving)
                 if (type.equals("USER_JOINED")) {
                     String newUserId = op.get("userId").getAsString();
-                    connectedUsers.put(newUserId, new RemoteUser(newUserId, "User-" + newUserId.substring(0,2)));
+                    connectedUsers.put(newUserId, new RemoteUser(newUserId, "User-" + newUserId.substring(0, 2)));
                     refreshUserList();
                     return;
                 }
@@ -82,18 +133,28 @@ public class Main extends Application {
                     return;
                 }
 
-                // 2. Handle Document-Messages (Insert/Delete)
+                // 2. Handle Document-Messages (Insert / Delete / Format)
                 String siteId = op.get("siteId").getAsString();
-                // ====================================================
-                // NEW: AUTO-DISCOVERY
-                // If a user types and we don't know them, add them to the sidebar!
+
+                // AUTO-DISCOVERY: If a user types and we don't know them, add them to the sidebar!
                 if (!siteId.equals(myUserId) && !connectedUsers.containsKey(siteId)) {
                     connectedUsers.put(siteId, new RemoteUser(siteId, siteId));
-                    refreshUserList(); // Redraw the UI
+                    refreshUserList();
                 }
-                // ====================================================
+
                 int clock = op.get("clock").getAsInt();
 
+                // ── FORMAT message: only re-style, no caret shift ─────────────
+                if (type.equals("FORMAT")) {
+                    boolean bold   = op.get("bold").getAsBoolean();
+                    boolean italic = op.get("italic").getAsBoolean();
+                    myCrdt.applyBold(siteId, clock, bold);
+                    myCrdt.applyItalic(siteId, clock, italic);
+                    if (editor != null) refreshDisplay(editor.getCaretPosition());
+                    return;
+                }
+
+                // ── INSERT ────────────────────────────────────────────────────
                 if (type.equals("INSERT")) {
                     char value = op.get("value").getAsString().charAt(0);
                     String afterSiteId = (op.has("afterSiteId") && !op.get("afterSiteId").isJsonNull())
@@ -117,14 +178,15 @@ public class Main extends Application {
                     else if (type.equals("DELETE") && remoteChangeIndex < oldCursorIndex) newCursorIndex--;
                 }
 
-                editor.setText(myCrdt.getVisibleText());
-                editor.positionCaret(newCursorIndex);
+                // ── refreshDisplay replaces the old editor.setText + positionCaret ──
+                refreshDisplay(newCursorIndex);
 
             } catch (Exception e) {
                 System.err.println("JSON Error: " + e.getMessage());
             }
         });
     }
+
     // =========================================================================
     //  SCREEN 1 — WELCOME
     // =========================================================================
@@ -137,7 +199,7 @@ public class Main extends Application {
         primaryStage.setScene(new Scene(root));
     }
 
-    // Welcome header
+    // ── Welcome header ────────────────────────────────────────────────────────
     private HBox buildWelcomeHeader() {
         HBox header = new HBox();
         header.setStyle(bg(C_SURFACE_LOW));
@@ -161,12 +223,12 @@ public class Main extends Application {
         return header;
     }
 
-    // Welcome main (left + right columns)
+    // ── Welcome main (left panel only, centred) ───────────────────────────────
     private HBox buildWelcomeMain() {
         HBox main = new HBox();
-        VBox left  = buildConnectPanel();
+        VBox left = buildConnectPanel();
         HBox.setHgrow(left, Priority.ALWAYS);
-        main.setAlignment(Pos.CENTER); // Centers the remaining panel
+        main.setAlignment(Pos.CENTER);
         main.getChildren().add(left);
         return main;
     }
@@ -185,11 +247,11 @@ public class Main extends Application {
 
         // 1. Create the form fields using your helper
         VBox serverAddressBox = formField("Server Address", "ws://your-server:port", "ws://localhost:8888");
-        VBox roomCodeBox = formField("Room ID", "Enter session code...", "");
+        VBox roomCodeBox      = formField("Room ID",        "Enter session code...", "");
 
         // 2. Extract the actual TextField components from those VBoxes so we can read them
         TextField serverAddressInput = (TextField) serverAddressBox.getChildren().get(1);
-        TextField roomCodeInput = (TextField) roomCodeBox.getChildren().get(1);
+        TextField roomCodeInput      = (TextField) roomCodeBox.getChildren().get(1);
 
         // 3. Build the form
         VBox form = new VBox(24);
@@ -210,25 +272,19 @@ public class Main extends Application {
                 String targetServer = serverAddressInput.getText();
                 System.out.println("Attempting to connect to: " + targetServer);
 
-
                 webSocketClient = new CollabClient(targetServer, message -> handleRemoteOperation(message));
                 webSocketClient.connect();
 
                 showEditor();
-
             } catch (Exception ex) {
                 System.err.println("Failed to build the client!");
                 ex.printStackTrace();
             }
         });
         return panel;
-
-
     }
 
-
-
-    // Shared status bar
+    // ── Shared status bar ─────────────────────────────────────────────────────
     private HBox buildStatusBar() {
         HBox bar = new HBox();
         bar.setStyle(bg(C_SURFACE_HIGH));
@@ -243,11 +299,11 @@ public class Main extends Application {
         pulse.setCycleCount(Timeline.INDEFINITE);
         pulse.play();
 
-        Label offline = new Label("OFFLINE");
+        Label offline  = new Label("OFFLINE");
         offline.setStyle(fg(C_ON_SURFACE_VAR) + "-fx-font-size:9px;-fx-font-weight:bold;");
         Rectangle divLine = new Rectangle(1, 12, Color.web(C_OUTLINE_VAR));
         divLine.setOpacity(0.3);
-        Label version = new Label("v1.0.4-stable");
+        Label version  = new Label("v1.0.4-stable");
         version.setStyle(fg(C_ON_SURFACE_VAR) + "-fx-font-size:9px;");
 
         HBox left = new HBox(8, dot, offline, divLine, version);
@@ -278,7 +334,7 @@ public class Main extends Application {
         primaryStage.setScene(new Scene(root));
     }
 
-    // Editor top (header + toolbar)
+    // ── Editor top (header + toolbar) ────────────────────────────────────────
     private VBox buildEditorTop() {
         // header
         HBox header = new HBox();
@@ -314,10 +370,6 @@ public class Main extends Application {
                 + fg(C_ON_SURFACE_VAR) + "-fx-font-size:13px;-fx-pref-width:160;");
         searchBox.getChildren().addAll(searchIcon, searchField);
 
-        HBox rightIcons = new HBox(4, iconBtn("⚙"), iconBtn("👤"));
-        rightIcons.setAlignment(Pos.CENTER);
-        rightIcons.setPadding(new Insets(0, 0, 0, 8));
-
         header.getChildren().addAll(leftGroup, sp);
 
         // toolbar
@@ -344,18 +396,29 @@ public class Main extends Application {
 
         Region tsp = new Region(); HBox.setHgrow(tsp, Priority.ALWAYS);
 
+        // ── Bold button — stored as field so updateFmtButtonStates() can style it ──
+        boldBtn = fmtBtn("B");
+        // Override onMouseExited so hover release respects the current active state
+        boldBtn.setOnMouseExited(e -> updateFmtButtonStates(editor != null ? editor.getCaretPosition() : 0));
+        boldBtn.setOnAction(e -> applyFormattingToSelection(true, false));
+
+        // ── Italic button ─────────────────────────────────────────────────────
+        italicBtn = fmtBtn("I");
+        italicBtn.setOnMouseExited(e -> updateFmtButtonStates(editor != null ? editor.getCaretPosition() : 0));
+        italicBtn.setOnAction(e -> applyFormattingToSelection(false, true));
+
         HBox fmtBar = new HBox(2);
         fmtBar.setAlignment(Pos.CENTER);
         fmtBar.setStyle(bg(C_SURFACE_HIGH) + "-fx-background-radius:20;-fx-padding:4;");
-        fmtBar.getChildren().addAll(fmtBtn("B"), fmtBtn("I"),
+        fmtBar.getChildren().addAll(boldBtn, italicBtn,
                 new Separator(Orientation.VERTICAL), fmtBtn("≡"), fmtBtn("🔗"));
 
-        toolbar.getChildren().addAll(statusGrp, tsp);
+        toolbar.getChildren().addAll(statusGrp, tsp, fmtBar);
 
         return new VBox(header, toolbar);
     }
 
-    // ── Editor center (textarea + sidebar) ────────────────────────────────────
+    // ── Editor center (rich-text area + sidebar) ──────────────────────────────
     private HBox buildEditorCenter() {
         HBox center = new HBox();
 
@@ -368,16 +431,23 @@ public class Main extends Application {
         Label docTitle = new Label("Draft_01");
         docTitle.setStyle(fg(C_ON_SURFACE) + "-fx-font-size:38px;-fx-font-weight:900;-fx-opacity:0.10;");
 
-
-        editor = new TextArea("");
-        editor.setFont(Font.font("Monospaced", 14));
-        editor.setStyle(bg(C_BG) + fg(C_ON_SURFACE)
-                + "-fx-border-color:transparent;-fx-background-radius:0;-fx-padding:0;");
+        // ── CHANGED: InlineCssTextArea instead of TextArea ────────────────────
+        editor = new InlineCssTextArea();
         editor.setWrapText(true);
-        VBox.setVgrow(editor, Priority.ALWAYS);
+        // Component-level CSS: background + transparent border (no font here —
+        // font is set per-character via charCss() to support inline bold/italic).
+        editor.setStyle(bg(C_BG)
+                + "-fx-border-color: transparent;"
+                + "-fx-background-radius: 0;"
+                + "-fx-padding: 0;");
+
+        // VirtualizedScrollPane is mandatory for RichTextFX to scroll correctly.
+        VirtualizedScrollPane<InlineCssTextArea> editorScroll = new VirtualizedScrollPane<>(editor);
+        VBox.setVgrow(editorScroll, Priority.ALWAYS);
+        // ── END OF CHANGE ─────────────────────────────────────────────────────
 
         // =========================================================
-        //  CRDT INTEGRATION
+        //  CRDT INTEGRATION  (identical logic, updated API calls)
         // =========================================================
 
         // 1. INTERCEPT TYPING
@@ -395,45 +465,56 @@ public class Main extends Application {
                 CharacterNode prevNode = myCrdt.getVisibleNodeAt(cursorIndex - 1);
                 if (prevNode != null) {
                     afterSiteId = prevNode.siteId;
-                    afterClock = prevNode.clock;
+                    afterClock  = prevNode.clock;
                 }
             }
 
             char letter = characterStr.charAt(0);
 
-            // 1. Update local CRDT and get the new Node
+            // Update local CRDT and get the new node
             CharacterNode newNode = myCrdt.localInsert(letter, afterSiteId, afterClock);
 
-            // 2. Safely escape quotes and backslashes for JSON!
-            String safeValue = String.valueOf(newNode.value);
-            if (newNode.value == '\\') {
-                safeValue = "\\\\";
-            } else if (newNode.value == '"') {
-                safeValue = "\\\"";
-            }
+            // ── Apply current bold/italic typing-mode to the new character ────
+            if (boldActive)   myCrdt.applyBold(newNode.siteId, newNode.clock, true);
+            if (italicActive) myCrdt.applyItalic(newNode.siteId, newNode.clock, true);
 
-            // 3. Format the operation as a JSON String
+            // Safely escape quotes and backslashes for JSON
+            String safeValue = String.valueOf(newNode.value);
+            if (newNode.value == '\\') safeValue = "\\\\";
+            else if (newNode.value == '"') safeValue = "\\\"";
+
+            // Format the INSERT operation as a JSON string
             String afterIdJson = (newNode.afterSiteId == null) ? "null" : "\"" + newNode.afterSiteId + "\"";
             String insertMessage = String.format(
                     "{\"type\": \"INSERT\", \"siteId\": \"%s\", \"clock\": %d, \"value\": \"%s\", \"afterSiteId\": %s, \"afterClock\": %d}",
                     newNode.siteId, newNode.clock, safeValue, afterIdJson, newNode.afterClock
             );
 
-            // 4. Send it to the server!
+            // Send INSERT to server
             if (webSocketClient != null && webSocketClient.isOpen()) {
                 webSocketClient.send(insertMessage);
             }
 
-            // Redraw UI
+            // If we applied formatting, send a separate FORMAT message
+            if (boldActive || italicActive) {
+                String formatMessage = String.format(
+                        "{\"type\": \"FORMAT\", \"siteId\": \"%s\", \"clock\": %d, \"bold\": %b, \"italic\": %b}",
+                        newNode.siteId, newNode.clock, newNode.isBold, newNode.isItalic
+                );
+                if (webSocketClient != null && webSocketClient.isOpen()) {
+                    webSocketClient.send(formatMessage);
+                }
+            }
+
+            // Redraw UI with styles
             event.consume();
-            editor.setText(myCrdt.getVisibleText());
-            editor.positionCaret(cursorIndex + 1);
+            refreshDisplay(cursorIndex + 1);
         });
 
         // 2. INTERCEPT SPECIAL KEYS (Enter & Backspace)
         editor.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
 
-            // --- NEW ENTER LOGIC ---
+            // --- ENTER ---
             if (event.getCode() == KeyCode.ENTER) {
                 int cursorIndex = editor.getCaretPosition();
                 String afterSiteId = null;
@@ -443,14 +524,13 @@ public class Main extends Application {
                     CharacterNode prevNode = myCrdt.getVisibleNodeAt(cursorIndex - 1);
                     if (prevNode != null) {
                         afterSiteId = prevNode.siteId;
-                        afterClock = prevNode.clock;
+                        afterClock  = prevNode.clock;
                     }
                 }
 
-                // 1. Hardcode the newline insertion into the CRDT
                 CharacterNode newNode = myCrdt.localInsert('\n', afterSiteId, afterClock);
 
-                // 2. Format the JSON (passing "\\n" so it safely escapes over the network)
+                // Format the JSON (passing "\\n" so it safely escapes over the network)
                 String afterIdJson = (newNode.afterSiteId == null) ? "null" : "\"" + newNode.afterSiteId + "\"";
                 String insertMessage = String.format(
                         "{\"type\": \"INSERT\", \"siteId\": \"%s\", \"clock\": %d, \"value\": \"%s\", \"afterSiteId\": %s, \"afterClock\": %d}",
@@ -461,12 +541,11 @@ public class Main extends Application {
                     webSocketClient.send(insertMessage);
                 }
 
-                // 3. Stop JavaFX default behavior and redraw correctly
+                // Stop JavaFX default behaviour and redraw correctly
                 event.consume();
-                editor.setText(myCrdt.getVisibleText());
-                editor.positionCaret(cursorIndex + 1);
+                refreshDisplay(cursorIndex + 1);
 
-                // --- EXISTING BACKSPACE LOGIC ---
+                // --- BACKSPACE ---
             } else if (event.getCode() == KeyCode.BACK_SPACE) {
                 int cursorIndex = editor.getCaretPosition();
 
@@ -474,35 +553,39 @@ public class Main extends Application {
                     CharacterNode nodeToDelete = myCrdt.getVisibleNodeAt(cursorIndex - 1);
 
                     if (nodeToDelete != null) {
-                        // 1. Update local CRDT
+                        // Update local CRDT
                         myCrdt.localDelete(nodeToDelete.siteId, nodeToDelete.clock);
 
-                        // 2. Format the DELETE operation as JSON
+                        // Format the DELETE operation as JSON
                         String deleteMessage = String.format(
                                 "{\"type\": \"DELETE\", \"siteId\": \"%s\", \"clock\": %d}",
                                 nodeToDelete.siteId, nodeToDelete.clock
                         );
 
-                        // 3. Send it to the server!
+                        // Send to server
                         if (webSocketClient != null && webSocketClient.isOpen()) {
                             webSocketClient.send(deleteMessage);
                         }
                     }
 
                     event.consume();
-                    editor.setText(myCrdt.getVisibleText());
-                    editor.positionCaret(cursorIndex - 1);
+                    refreshDisplay(cursorIndex - 1);
                 }
             }
         });
+
+        // 3. UPDATE BOLD/ITALIC BUTTON HIGHLIGHT when caret moves
+        editor.caretPositionProperty().addListener((obs, oldPos, newPos) ->
+                updateFmtButtonStates(newPos.intValue()));
 
         // =========================================================
         //  END OF CRDT INTEGRATION
         // =========================================================
 
-        editorArea.getChildren().addAll(docTitle, editor);
+        // Use editorScroll (the VirtualizedScrollPane wrapper) in the layout
+        editorArea.getChildren().addAll(docTitle, editorScroll);
 
-        // sidebar
+        // ── sidebar (unchanged from original) ─────────────────────────────────
         VBox sidebar = new VBox();
         sidebar.setPrefWidth(272);
         sidebar.setMinWidth(272);
@@ -523,13 +606,11 @@ public class Main extends Application {
         VBox userList = new VBox(2);
         VBox.setVgrow(userList, Priority.ALWAYS);
 
-        // 1. Link the global variable so handleRemoteOperation knows where to draw
+        // Link the global variable so handleRemoteOperation knows where to draw
         this.userListContainer = userList;
 
-        // 2. This method clears the list and adds "You" (and any remote users)
+        // Clears the list and adds "You" (and any remote users)
         refreshUserList();
-
-        // 3. (DELETED the manual addAll block that was here)
 
         // bottom of sidebar
         VBox bottomActions = new VBox(0);
@@ -550,7 +631,6 @@ public class Main extends Application {
         sep.setStyle("-fx-background-color:" + C_OUTLINE_VAR + ";-fx-opacity:0.1;");
         VBox.setMargin(sep, new Insets(16, 0, 0, 0));
 
-        // back-to-welcome option in Help row
         HBox helpRow   = sidebarAction("❓", "Help",   false);
         HBox logoutRow = sidebarAction("🚪", "Logout", true);
         logoutRow.setOnMouseClicked(e -> showWelcome());
@@ -562,9 +642,135 @@ public class Main extends Application {
         return center;
     }
 
+    // =========================================================================
+    //  RICHTEXTFX HELPERS
+    // =========================================================================
+
+    /**
+     * Rebuilds the InlineCssTextArea from the CRDT and restores the caret.
+     * Replaces every old  editor.setText(...) + editor.positionCaret(...)  pair.
+     *
+     * Step 1: replaceText() sets the raw characters (clears all inline styles).
+     * Step 2: setStyle(i, i+1, css) re-applies bold/italic per character.
+     * Step 3: moveTo() restores the caret.
+     */
+    private void refreshDisplay(int targetCaret) {
+        if (editor == null) return;
+
+        List<CharacterNode> nodes = myCrdt.getVisibleNodes();
+
+        // Build plain text from the visible node list
+        StringBuilder sb = new StringBuilder();
+        for (CharacterNode n : nodes) sb.append(n.value);
+        String newText = sb.toString();
+
+        // Set text (this clears all per-character styles automatically)
+        editor.replaceText(0, editor.getLength(), newText);
+
+        // Re-apply per-character bold/italic CSS
+        for (int i = 0; i < nodes.size(); i++) {
+            CharacterNode n = nodes.get(i);
+            editor.setStyle(i, i + 1, charCss(n.isBold, n.isItalic));
+        }
+
+        // Restore caret, clamped so it never exceeds the new length
+        int clampedCaret = Math.min(targetCaret, newText.length());
+        editor.moveTo(clampedCaret);
+    }
+
+    /**
+     * Applies bold OR italic to the currently selected text range.
+     *
+     * • With a selection  → toggle that property on every selected character
+     *   (Word-style: if ALL chars are already bold → un-bold; otherwise bold all)
+     *   and broadcast FORMAT messages.
+     * • Without a selection → flip the "typing mode" flag so the next typed
+     *   characters will be bold/italic.
+     *
+     * @param isBoldToggle   true when the Bold   button was clicked
+     * @param isItalicToggle true when the Italic button was clicked
+     */
+    private void applyFormattingToSelection(boolean isBoldToggle, boolean isItalicToggle) {
+        if (editor == null) return;
+
+        IndexRange sel = editor.getSelection();
+
+        // ── No selection: toggle typing-mode flag only ─────────────────────────
+        if (sel.getLength() == 0) {
+            if (isBoldToggle)   boldActive   = !boldActive;
+            if (isItalicToggle) italicActive = !italicActive;
+            updateFmtButtonStates(editor.getCaretPosition());
+            return;
+        }
+
+        // ── Selection present: apply to every character in range ───────────────
+        List<CharacterNode> allNodes = myCrdt.getVisibleNodes();
+        int from = sel.getStart();
+        int to   = Math.min(sel.getEnd(), allNodes.size());
+        if (from >= to) return;
+
+        List<CharacterNode> selected = allNodes.subList(from, to);
+
+        if (isBoldToggle) {
+            // If every selected char is already bold → remove bold; otherwise add it
+            boolean allBold = selected.stream().allMatch(n -> n.isBold);
+            boolean newBold = !allBold;
+            for (CharacterNode node : selected) {
+                myCrdt.applyBold(node.siteId, node.clock, newBold);
+                String msg = String.format(
+                        "{\"type\": \"FORMAT\", \"siteId\": \"%s\", \"clock\": %d, \"bold\": %b, \"italic\": %b}",
+                        node.siteId, node.clock, newBold, node.isItalic);
+                if (webSocketClient != null && webSocketClient.isOpen()) webSocketClient.send(msg);
+            }
+        }
+
+        if (isItalicToggle) {
+            boolean allItalic = selected.stream().allMatch(n -> n.isItalic);
+            boolean newItalic = !allItalic;
+            for (CharacterNode node : selected) {
+                myCrdt.applyItalic(node.siteId, node.clock, newItalic);
+                String msg = String.format(
+                        "{\"type\": \"FORMAT\", \"siteId\": \"%s\", \"clock\": %d, \"bold\": %b, \"italic\": %b}",
+                        node.siteId, node.clock, node.isBold, newItalic);
+                if (webSocketClient != null && webSocketClient.isOpen()) webSocketClient.send(msg);
+            }
+        }
+
+        refreshDisplay(editor.getCaretPosition());
+        updateFmtButtonStates(editor.getCaretPosition());
+    }
+
+    /**
+     * Reads the character at caretPos and highlights the Bold/Italic buttons
+     * to reflect the formatting at the current cursor position.
+     * Called on every caret move (listener) and after every format operation.
+     */
+    private void updateFmtButtonStates(int caretPos) {
+        if (boldBtn == null || italicBtn == null) return;
+
+        // Read formatting from the character just to the left of the caret
+        if (caretPos > 0) {
+            CharacterNode node = myCrdt.getVisibleNodeAt(caretPos - 1);
+            if (node != null) {
+                boldActive   = node.isBold;
+                italicActive = node.isItalic;
+            }
+        }
+
+        // Highlighted style when the property is active at the cursor
+        String activeStyle = bg(C_PRIMARY_CONTAINER) + fg(C_PRIMARY)
+                + "-fx-font-size:14px;-fx-font-weight:bold;-fx-cursor:hand;"
+                + "-fx-padding:6 10 6 10;-fx-background-radius:20;";
+        String inactiveStyle = "-fx-background-color:transparent;" + fg(C_ON_SURFACE_VAR)
+                + "-fx-font-size:14px;-fx-font-weight:bold;-fx-cursor:hand;"
+                + "-fx-padding:6 10 6 10;-fx-background-radius:20;";
+
+        boldBtn.setStyle(boldActive     ? activeStyle : inactiveStyle);
+        italicBtn.setStyle(italicActive ? activeStyle : inactiveStyle);
+    }
 
     // =========================================================================
-    //  SHARED COMPONENT BUILDERS
+    //  SHARED COMPONENT BUILDERS  (all unchanged from original)
     // =========================================================================
     private Label navLink(String text, boolean active) {
         Label lbl = new Label(text);
@@ -624,6 +830,7 @@ public class Main extends Application {
         field.getChildren().addAll(lbl, tf);
         return field;
     }
+
     private void playSound() {
         try {
             String soundPath = getClass().getResource("/Perfect.wav").toExternalForm();
@@ -687,35 +894,51 @@ public class Main extends Application {
         row.getChildren().addAll(iconLbl, textLbl);
         return row;
     }
+
+    // =========================================================================
+    //  FIELDS
+    // =========================================================================
     private String myUserId = "User-" + java.util.UUID.randomUUID().toString().substring(0, 4).toUpperCase();
     private DocumentCRDT myCrdt = new DocumentCRDT(myUserId);
     private CollabClient webSocketClient;
-    private TextArea editor;
+
+    // ── CHANGED: InlineCssTextArea instead of TextArea ────────────────────────
+    private InlineCssTextArea editor;
+
+    // ── NEW: formatting toolbar state ─────────────────────────────────────────
+    private Button  boldBtn;
+    private Button  italicBtn;
+    private boolean boldActive   = false;   // "type bold" mode when no selection
+    private boolean italicActive = false;   // "type italic" mode when no selection
+
     public static void main(String[] args) { launch(args); }
+
     // Simple helper to track remote users
     public static class RemoteUser {
         String id;
         String name;
         public RemoteUser(String id, String name) { this.id = id; this.name = name; }
     }
+
     private java.util.Map<String, RemoteUser> connectedUsers = new java.util.HashMap<>();
-    private VBox userListContainer; // We'll link this to the UI
+    private VBox userListContainer;
 
     private void refreshUserList() {
         Platform.runLater(() -> {
-            if (userListContainer == null) return; // Safety check
+            if (userListContainer == null) return;
 
             userListContainer.getChildren().clear();
 
-            // 1. Draw "YOU"
+            // Draw "YOU"
             String initials = myUserId.length() > 2 ? myUserId.substring(0, 2) : myUserId;
             userListContainer.getChildren().add(userRow(initials, myUserId + " (You)", "Lead Editor", true));
 
-            // 2. Draw EVERYONE ELSE in the connectedUsers map
+            // Draw everyone else in the connectedUsers map
             for (RemoteUser u : connectedUsers.values()) {
                 String uInitials = u.name.length() > 2 ? u.name.substring(0, 2) : u.name;
                 userListContainer.getChildren().add(userRow(uInitials, u.name, "Editor", false));
             }
         });
     }
+
 }

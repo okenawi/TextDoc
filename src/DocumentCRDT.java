@@ -294,5 +294,20 @@ public class DocumentCRDT  {
         }
         return -1; // Not found
     }
+    // ─────────────────────────────────────────
+    // GET VISIBLE NODES (UI Helper)
+    // Returns a list of all non-deleted characters.
+    // Required by RichTextFX to rebuild the text area.
+    // ─────────────────────────────────────────
+    public java.util.List<CharacterNode> getVisibleNodes() {
+        java.util.List<CharacterNode> visibleNodes = new java.util.ArrayList<>();
+        for (CharacterNode c : characters) {
+            if (!c.isDeleted) {
+                visibleNodes.add(c);
+            }
+        }
+        return visibleNodes;
+    }
+
 }
 

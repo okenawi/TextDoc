@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="richtextfx-fat-0.11.7">
+    <CLASSES>
+      <root url="jar://$USER_HOME$/Downloads/openjfx-26_windows-x64_bin-sdk/openjfx-26_windows-x64_bin-sdk/lib/richtextfx-fat-0.11.7.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
