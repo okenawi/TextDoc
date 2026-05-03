@@ -3,43 +3,39 @@ import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import org.bson.Document;
-import javafx.animation.*;
-import javafx.geometry.*;
-import javafx.scene.*;
-import javafx.scene.control.*;
-import javafx.scene.layout.*;
-import javafx.scene.shape.*;
-import javafx.scene.text.*;
 
 public class Database {
 
-    public static void main(String[] args) {
+    private static final String URI  = "mongodb://localhost:27017";
+    private static final String NAME = "textdoc";
 
-        String uri = "mongodb://localhost:27017";
+    private static MongoClient   client;
+    private static MongoDatabase database;
 
-        // Connect to MongoDB
-        try (MongoClient client = MongoClients.create(uri)) {
-
-            // Get database
-            MongoDatabase database = client.getDatabase("myDatabase");
-
-            // Get collection
-            MongoCollection<Document> usersCollection = database.getCollection("users");
-
-            // Create document
-            Document user = new Document()
-                    .append("name", "seif alaaaa")
-                    .append("age", 21)
-                    .append("university", "Cairo University");
-
-            // Insert document
-            usersCollection.insertOne(user);
-
-            System.out.println("✅ User inserted successfully!");
-
+    // call this ONCE when server starts
+    // keeps one connection open for the whole session
+    public static void initialize() {
+        try {
+            client   = MongoClients.create(URI);
+            database = client.getDatabase(NAME);
+            System.out.println("✅ MongoDB connected: " + NAME);
         } catch (Exception e) {
-            System.out.println("❌ Error occurred:");
+            System.err.println("❌ MongoDB connection failed");
             e.printStackTrace();
+        }
+    }
+
+    // each repository calls this to get its collection
+    public static MongoCollection<Document> getCollection(String collectionName) {
+        return database.getCollection(collectionName);
+        // if collection doesn't exist MongoDB creates it automatically ✅
+    }
+
+    // call this when server shuts down
+    public static void close() {
+        if (client != null) {
+            client.close();
+            System.out.println("MongoDB connection closed");
         }
     }
 }
