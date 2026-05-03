@@ -119,6 +119,40 @@ public class Main extends Application {
                 String type = op.get("type").getAsString();
 
                 // 1. Handle Meta-Messages First (Users joining/leaving)
+                // ✅ Server accepted our join — store role and open the editor
+                if (type.equals("JOIN_ACCEPTED")) {
+                    myRole = op.get("role").getAsString();
+                    // ✅ Mark that history ops coming next are replay, not new ops
+                    historyReplayDone = false;
+                    Platform.runLater(() -> showEditor());
+                    return;
+                }
+                if (type.equals("HISTORY_START")) {
+                    // ✅ Wipe the CRDT clean right before replay begins
+                    myCrdt = new DocumentCRDT(myUserId);
+                    return;
+                }
+
+                if (type.equals("HISTORY_END")) {
+                    // ✅ Replay is done, refresh the display once
+                    historyReplayDone = true;
+                    Platform.runLater(() -> refreshDisplay(0));
+                    return;
+                }
+
+                // ✅ Server rejected our code — show an alert and stay on welcome screen
+                if (type.equals("JOIN_REJECTED")) {
+                    String reason = op.get("reason").getAsString();
+                    Platform.runLater(() -> {
+                        Alert alert = new Alert(Alert.AlertType.ERROR);
+                        alert.setTitle("Connection Rejected");
+                        alert.setHeaderText("Invalid Room Code");
+                        alert.setContentText(reason);
+                        alert.showAndWait();
+                    });
+                    return;
+                }
+
                 if (type.equals("USER_JOINED")) {
                     String newUserId = op.get("userId").getAsString();
                     connectedUsers.put(newUserId, new RemoteUser(newUserId, "User-" + newUserId.substring(0, 2)));
@@ -247,7 +281,7 @@ public class Main extends Application {
 
         // 1. Create the form fields using your helper
         VBox serverAddressBox = formField("Server Address", "ws://your-server:port", "ws://localhost:8888");
-        VBox roomCodeBox      = formField("Room ID",        "Enter session code...", "");
+        VBox roomCodeBox      = formField("Room Code", "Enter 6-character code...", ""); // ✅ renamed
 
         // 2. Extract the actual TextField components from those VBoxes so we can read them
         TextField serverAddressInput = (TextField) serverAddressBox.getChildren().get(1);
@@ -269,21 +303,30 @@ public class Main extends Application {
         panel.getChildren().addAll(hello, sub, form, connectBtn);
         connectBtn.setOnAction(e -> {
             try {
-                // ✅ Close old connection if one exists
                 if (webSocketClient != null && webSocketClient.isOpen()) {
                     webSocketClient.close();
                 }
-
-                // ✅ Wipe old session state before building the new screen
                 resetSession();
 
                 String targetServer = serverAddressInput.getText();
-                System.out.println("Attempting to connect to: " + targetServer);
+                String enteredCode  = roomCodeInput.getText().trim().toUpperCase();
 
                 webSocketClient = new CollabClient(targetServer, message -> handleRemoteOperation(message));
                 webSocketClient.connect();
 
-                showEditor();
+                // ✅ Small delay to let the socket handshake finish, then send JOIN
+                new Thread(() -> {
+                    try {
+                        Thread.sleep(500);
+                        String joinMsg = String.format(
+                                "{\"type\":\"JOIN\",\"code\":\"%s\",\"siteId\":\"%s\"}",
+                                enteredCode, myUserId);
+                        webSocketClient.send(joinMsg);
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    }
+                }).start();
+
             } catch (Exception ex) {
                 System.err.println("Failed to build the client!");
                 ex.printStackTrace();
@@ -442,6 +485,8 @@ public class Main extends Application {
         // ── CHANGED: InlineCssTextArea instead of TextArea ────────────────────
         editor = new InlineCssTextArea();
         editor.setWrapText(true);
+        editor.setEditable("editor".equals(myRole)); // ✅ viewers get read-only instantly
+
         // Component-level CSS: background + transparent border (no font here —
         // font is set per-character via charCss() to support inline bold/italic).
         editor.setStyle(bg(C_BG)
@@ -461,6 +506,7 @@ public class Main extends Application {
         // 1. INTERCEPT TYPING
         editor.addEventFilter(KeyEvent.KEY_TYPED, event -> {
             String characterStr = event.getCharacter();
+            if (!"editor".equals(myRole)) { event.consume(); return; } // ✅ block viewers
 
             // Block empty characters AND control keys (like Enter). We handle Enter in KEY_PRESSED!
             if (characterStr.isEmpty() || characterStr.charAt(0) < 32) return;
@@ -521,6 +567,7 @@ public class Main extends Application {
 
         // 2. INTERCEPT SPECIAL KEYS (Enter & Backspace)
         editor.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            if (!"editor".equals(myRole)) { event.consume(); return; }
 
             // --- ENTER ---
             if (event.getCode() == KeyCode.ENTER) {
@@ -904,17 +951,22 @@ public class Main extends Application {
     }
     private void resetSession() {
         myUserId = "User-" + java.util.UUID.randomUUID().toString().substring(0, 4).toUpperCase();
-        myCrdt = new DocumentCRDT(myUserId);
+        myCrdt = new DocumentCRDT(myUserId);  // brand new empty CRDT
         connectedUsers.clear();
         editor = null;
         boldActive = false;
         italicActive = false;
+        myRole = "editor";
+        historyReplayDone = false; // ✅ flag that history is not yet replayed
     }
     // =========================================================================
     //  FIELDS
     // =========================================================================
+
     private String myUserId = "User-" + java.util.UUID.randomUUID().toString().substring(0, 4).toUpperCase();
+    private String myRole = "editor"; // ✅ will be set to "editor" or "viewer" after JOIN_ACCEPTED
     private DocumentCRDT myCrdt = new DocumentCRDT(myUserId);
+    private boolean historyReplayDone = false;
     private CollabClient webSocketClient;
 
     // ── CHANGED: InlineCssTextArea instead of TextArea ────────────────────────

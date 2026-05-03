@@ -22,6 +22,9 @@ public class CollabServer extends WebSocketServer {
     // A thread-safe set to keep track of all connected users
     private final Set<WebSocket> activeConnections;
 
+    private static final java.util.Map<String, String[]> ROOM_CODES = new java.util.HashMap<>();
+
+
     public CollabServer(int port) {
         super(new InetSocketAddress(port));
         // We use synchronizedSet to handle concurrent users safely (no blocking!)
@@ -71,9 +74,31 @@ public class CollabServer extends WebSocketServer {
             Gson gson = new Gson();
             JsonObject json = gson.fromJson(message, JsonObject.class);
 
-            String type       = json.get("type").getAsString();
-            String siteId     = json.get("siteId").getAsString();
-            int    clock      = json.get("clock").getAsInt();
+            String type = json.get("type").getAsString();
+
+            // ✅ Handle JOIN handshake before anything else
+            if (type.equals("JOIN")) {
+                String code = json.get("code").getAsString();
+                if (!ROOM_CODES.containsKey(code)) {
+                    conn.send("{\"type\":\"JOIN_REJECTED\",\"reason\":\"Invalid room code\"}");
+                    conn.close();
+                    return;
+                }
+                String[] roomInfo = ROOM_CODES.get(code);
+                String role = roomInfo[1]; // "editor" or "viewer"
+                conn.setAttachment(role);  // store role on the connection itself
+                conn.send("{\"type\":\"JOIN_ACCEPTED\",\"role\":\"" + role + "\"}");
+
+                // ✅ Wrap history in markers so client knows when replay ends
+                conn.send("{\"type\":\"HISTORY_START\"}");
+                List<String> history = OperationRepository.getOperations(roomInfo[0]);
+                for (String op : history) conn.send(op);
+                conn.send("{\"type\":\"HISTORY_END\"}");
+                return;
+            }
+
+            String siteId = json.get("siteId").getAsString();
+            int    clock  = json.get("clock").getAsInt();
 
             // For now use siteId as documentId — you can change this later
             // when you add real document/room management
@@ -105,6 +130,14 @@ public class CollabServer extends WebSocketServer {
         }
 
         // Broadcast to all other clients
+        // ✅ Block viewers from sending document operations
+        String senderRole = conn.getAttachment();
+        if ("viewer".equals(senderRole)) {
+            conn.send("{\"type\":\"PERMISSION_DENIED\",\"reason\":\"Viewers cannot edit\"}");
+            return;
+        }
+
+        // Broadcast to all other clients
         synchronized (activeConnections) {
             for (WebSocket client : activeConnections) {
                 if (client != conn && client.isOpen()) {
@@ -126,6 +159,25 @@ public class CollabServer extends WebSocketServer {
         System.out.println("Listening for connections on port: " + getPort());
         Database.initialize();
 
+        // ✅ Generate one editor + one viewer code for the default room
+        String editorCode = generateCode();
+        String viewerCode = generateCode();
+        ROOM_CODES.put(editorCode, new String[]{"default", "editor"});
+        ROOM_CODES.put(viewerCode, new String[]{"default", "viewer"});
+
+        System.out.println("=================================");
+        System.out.println("📝 EDITOR CODE : " + editorCode);
+        System.out.println("👁  VIEWER CODE : " + viewerCode);
+        System.out.println("=================================");
+    }
+
+    // ✅ ADD THIS helper method anywhere in the class body
+    private String generateCode() {
+        String chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        java.util.Random rng = new java.util.Random();
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 6; i++) sb.append(chars.charAt(rng.nextInt(chars.length())));
+        return sb.toString();
     }
 
     // Main method to run the server standalone

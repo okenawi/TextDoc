@@ -1,0 +1,10 @@
+<component name="libraryTable">
+  <library name="dep">
+    <CLASSES>
+      <root url="file://E:/Uni/APT/openjfx-26_windows-x64_bin-sdk/openjfx-26_windows-x64_bin-sdk/dep" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+    <jarDirectory url="file://E:/Uni/APT/openjfx-26_windows-x64_bin-sdk/openjfx-26_windows-x64_bin-sdk/dep" recursive="false" />
+  </library>
+</component>
