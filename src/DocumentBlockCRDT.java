@@ -1,14 +1,3 @@
-/*DocumentBlockCRDT          ← manages the list of blocks
-    │
-    ├── BlockNode 1        ← a line
-    │       └── DocumentCRDT  ← manages characters inside line 1
-    │
-    ├── BlockNode 2        ← another line
-    │       └── DocumentCRDT  ← manages characters inside line 2  //////////////// BLOCK 3OBARA 3N LINE EL LINE DAH CHARACHTERSSSSS////
-    │
-    └── BlockNode 3        ← another line
-            └── DocumentCRDT  ← manages characters inside line 3
-*/
 import java.util.LinkedList;
 
 public class DocumentBlockCRDT {
@@ -70,7 +59,7 @@ private String siteId;
         this.clock = Math.max(this.clock, incoming.clock);  /// bzbbbttt el clock m3 b2et el userrss el fel network///
         // insert at the very beginning
         if (incoming.afterSiteId == null)
-        {                                                              // m7tagen n3rf syntx kazza haga, 1- block.get(hena get btakhod position)--> ya3ny 3and position kazz hatly el block el henak dah
+        {// m7tagen n3rf syntx kazza haga, 1- block.get(hena get btakhod position)--> ya3ny 3and position kazz hatly el block el henak dah
             //// winsover(blocks.get(positon),incoming"incoming dah block bardo)---> deh boolean btrg33 true lw awl wahed yksb tany wahed...
             int insertAt = 0;                                           /// hwear el after dah 3shan ana btl8bt feh--> 3andy etnen blocks Block(A,1), Block(B,2)
         /// KEDA BLOCK b 3ando aftersiteId 'A' and afterClock'1' ya3ny hwa gy b3d A and time 1

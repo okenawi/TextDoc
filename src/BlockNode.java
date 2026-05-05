@@ -17,7 +17,7 @@ public BlockNode(String siteId, int clock, String afterSiteId, int afterClock)
     this.afterSiteId = afterSiteId;
     this.afterClock  = afterClock;
     this.isDeleted   = false;
-    this.content     = new DocumentCRDT(siteId); // empty line, ready to be typed in
+    this.content     = new DocumentCRDT(siteId);
 }
 
     public boolean hasSameId(String siteId,int clock)         /// 3ayz ASHOF EL BLOCK DAH MOWGOD WLA LA BEL ID WEL TIME BTA3O F FOR EXAMPLE HAKTB { if(block.hasSameId(A,3)) }

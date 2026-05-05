@@ -13,9 +13,7 @@ public class OperationRepository {
     }
 
 
-    // ── SAVE ONE OPERATION ───────────────────────────────────
-    // called by server every time it receives an INSERT or DELETE
-    // this is the op log we discussed
+
     public static void saveOperation(String documentId, String type,
                                      String siteId,     int    clock,
                                      String value,      String afterSiteId,
@@ -26,8 +24,8 @@ public class OperationRepository {
                 .append("type",        type)
                 .append("siteId",      siteId)
                 .append("clock",       clock)
-                .append("value",       value)        // null for DELETE
-                .append("afterSiteId", afterSiteId)  // null for first char
+                .append("value",       value)
+                .append("afterSiteId", afterSiteId)
                 .append("afterClock",  afterClock)
                 .append("isBold",      isBold)
                 .append("isItalic",    isItalic)
@@ -37,17 +35,13 @@ public class OperationRepository {
     }
 
 
-    // ── LOAD ALL OPERATIONS FOR A DOCUMENT ───────────────────
-    // called when a new user opens a document
-    // returns list of JSON strings
-    // server sends each one to the new user's handleRemoteOperation()
+
     public static List<String> getOperations(String documentId) {
         List<String> ops = new ArrayList<>();
 
         collection()
                 .find(Filters.eq("documentId", documentId))
                 .sort(Sorts.ascending("timestamp"))
-                // sort by timestamp → replay in correct order ✅
                 .forEach(doc -> {
 
                     String afterSiteId = doc.getString("afterSiteId");
@@ -55,8 +49,7 @@ public class OperationRepository {
                             ? "null"
                             : "\"" + afterSiteId + "\"";
 
-                    // rebuild as JSON in the exact format
-                    // Main.java's handleRemoteOperation() already knows
+
                     String json = String.format(
                             "{\"type\":\"%s\",\"siteId\":\"%s\",\"clock\":%d," +
                                     "\"value\":\"%s\",\"afterSiteId\":%s,\"afterClock\":%d}",
@@ -72,13 +65,11 @@ public class OperationRepository {
                 });
 
         return ops;
-        // Main.java already handles this format ✅
-        // no changes needed to CRDT or UI
+
     }
 
 
-    // ── DELETE ALL OPS FOR A DOCUMENT ────────────────────────
-    // called when document is deleted
+
     public static void deleteAllForDocument(String documentId) {
         collection().deleteMany(Filters.eq("documentId", documentId));
     }

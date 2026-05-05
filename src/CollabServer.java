@@ -19,15 +19,12 @@ import java.util.List;
 
 public class CollabServer extends WebSocketServer {
 
-    // A thread-safe set to keep track of all connected users
     private final Set<WebSocket> activeConnections;
-
     private static final java.util.Map<String, String[]> ROOM_CODES = new java.util.HashMap<>();
-//final versionnn
+
 
     public CollabServer(int port) {
         super(new InetSocketAddress(port));
-        // We use synchronizedSet to handle concurrent users safely (no blocking!)
         this.activeConnections = Collections.synchronizedSet(new HashSet<>());
     }
 
@@ -37,24 +34,20 @@ public class CollabServer extends WebSocketServer {
         System.out.println("NEW CONNECTION: " + conn.getRemoteSocketAddress());
         System.out.println("Total active users: " + activeConnections.size());
 
-        // Send the full operation history to the newly connected client
-        // so their document is immediately up to date
         try {
-            // ⚠️ This must match whatever documentId you're using when saving.
-            // Right now we're using "default" as a shared document ID for everyone.
             String documentId = "default";
             List<String> history = OperationRepository.getOperations(documentId);
 
-            System.out.println("📦 Sending " + history.size() + " operations to new client...");
+            System.out.println(" Sending " + history.size() + " operations to new client...");
 
             for (String op : history) {
                 conn.send(op);
             }
 
-            System.out.println("✅ History sent to: " + conn.getRemoteSocketAddress());
+            System.out.println(" History sent to: " + conn.getRemoteSocketAddress());
 
         } catch (Exception e) {
-            System.err.println("❌ Failed to send history: " + e.getMessage());
+            System.err.println(" Failed to send history: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -76,7 +69,6 @@ public class CollabServer extends WebSocketServer {
 
             String type = json.get("type").getAsString();
 
-            // ✅ Handle JOIN handshake before anything else
             if (type.equals("JOIN")) {
                 String code = json.get("code").getAsString();
                 if (!ROOM_CODES.containsKey(code)) {
@@ -85,11 +77,10 @@ public class CollabServer extends WebSocketServer {
                     return;
                 }
                 String[] roomInfo = ROOM_CODES.get(code);
-                String role = roomInfo[1]; // "editor" or "viewer"
-                conn.setAttachment(role);  // store role on the connection itself
+                String role = roomInfo[1];
+                conn.setAttachment(role);
                 conn.send("{\"type\":\"JOIN_ACCEPTED\",\"role\":\"" + role + "\"}");
 
-                // ✅ Wrap history in markers so client knows when replay ends
                 conn.send("{\"type\":\"HISTORY_START\"}");
                 List<String> history = OperationRepository.getOperations(roomInfo[0]);
                 for (String op : history) conn.send(op);
@@ -100,8 +91,6 @@ public class CollabServer extends WebSocketServer {
             String siteId = json.get("siteId").getAsString();
             int    clock  = json.get("clock").getAsInt();
 
-            // For now use siteId as documentId — you can change this later
-            // when you add real document/room management
             String documentId = "default";
 
             String value = (json.has("value") && !json.get("value").isJsonNull())
@@ -115,29 +104,25 @@ public class CollabServer extends WebSocketServer {
             boolean isBold   = json.has("isBold")   && json.get("isBold").getAsBoolean();
             boolean isItalic = json.has("isItalic") && json.get("isItalic").getAsBoolean();
 
-            // ✅ Save to MongoDB
             OperationRepository.saveOperation(
                     documentId, type, siteId, clock,
                     value, afterSiteId, afterClock,
                     isBold, isItalic
             );
 
-            System.out.println("✅ Saved to MongoDB: " + type + " by " + siteId);
+            System.out.println(" Saved to MongoDB: " + type + " by " + siteId);
 
         } catch (Exception e) {
-            System.err.println("❌ Failed to save to MongoDB: " + e.getMessage());
+            System.err.println(" Failed to save to MongoDB: " + e.getMessage());
             e.printStackTrace();
         }
 
-        // Broadcast to all other clients
-        // ✅ Block viewers from sending document operations
         String senderRole = conn.getAttachment();
         if ("viewer".equals(senderRole)) {
             conn.send("{\"type\":\"PERMISSION_DENIED\",\"reason\":\"Viewers cannot edit\"}");
             return;
         }
 
-        // Broadcast to all other clients
         synchronized (activeConnections) {
             for (WebSocket client : activeConnections) {
                 if (client != conn && client.isOpen()) {
@@ -159,19 +144,17 @@ public class CollabServer extends WebSocketServer {
         System.out.println("Listening for connections on port: " + getPort());
         Database.initialize();
 
-        // ✅ Generate one editor + one viewer code for the default room
         String editorCode = generateCode();
         String viewerCode = generateCode();
         ROOM_CODES.put(editorCode, new String[]{"default", "editor"});
         ROOM_CODES.put(viewerCode, new String[]{"default", "viewer"});
 
         System.out.println("=================================");
-        System.out.println("📝 EDITOR CODE : " + editorCode);
-        System.out.println("👁  VIEWER CODE : " + viewerCode);
+        System.out.println(" EDITOR CODE : " + editorCode);
+        System.out.println("  VIEWER CODE : " + viewerCode);
         System.out.println("=================================");
     }
 
-    // ✅ ADD THIS helper method anywhere in the class body
     private String generateCode() {
         String chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         java.util.Random rng = new java.util.Random();
@@ -180,12 +163,10 @@ public class CollabServer extends WebSocketServer {
         return sb.toString();
     }
 
-    // Main method to run the server standalone
     public static void main(String[] args) {
-        int port = 8888; // Standard local testing port
+        int port = 8888;
         CollabServer server = new CollabServer(port);
         server.start();
-        // The server runs on its own thread, so it won't block the rest of your app
     }
 }
 

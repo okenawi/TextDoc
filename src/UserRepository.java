@@ -10,13 +10,11 @@ public class UserRepository {
     }
 
 
-    // ── ADD USER TO DOCUMENT ─────────────────────────────────
-    // called when user joins a document via sharing code
+
     public static void addUser(String userId,
                                String documentId,
                                String permission) {
 
-        // check if already exists → don't add twice
         Document existing = collection().find(
                 Filters.and(
                         Filters.eq("userId",     userId),
@@ -39,8 +37,7 @@ public class UserRepository {
     }
 
 
-    // ── GET PERMISSION ───────────────────────────────────────
-    // returns "editor", "viewer", or null if not found
+
     public static String getPermission(String userId, String documentId) {
         Document user = collection().find(
                 Filters.and(
@@ -54,7 +51,6 @@ public class UserRepository {
     }
 
 
-    // ── PERMISSION CHECKS ────────────────────────────────────
     public static boolean isEditor(String userId, String documentId) {
         return "editor".equals(getPermission(userId, documentId));
     }
@@ -64,8 +60,7 @@ public class UserRepository {
     }
 
 
-    // ── DELETE ALL USERS FOR A DOCUMENT ─────────────────────
-    // called when document is deleted
+
     public static void deleteAllForDocument(String documentId) {
         collection().deleteMany(Filters.eq("documentId", documentId));
     }

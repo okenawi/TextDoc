@@ -7,10 +7,8 @@ import java.util.function.Consumer;
 
 public class    CollabClient extends WebSocketClient {
 
-    // This is the "wire" that connects the network back to your Main UI
     private Consumer<String> onMessageCallback;
 
-    // We updated the constructor to accept the callback
     public CollabClient(String serverUri, Consumer<String> onMessageCallback) throws URISyntaxException {
         super(new URI(serverUri));
         this.onMessageCallback = onMessageCallback;
@@ -25,7 +23,6 @@ public class    CollabClient extends WebSocketClient {
     public void onMessage(String message) {
         System.out.println("CLIENT RECEIVED: " + message);
 
-        // When a message arrives, send it through the wire to Main.java!
         if (onMessageCallback != null) {
             onMessageCallback.accept(message);
         }
