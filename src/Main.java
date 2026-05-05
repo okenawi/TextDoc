@@ -633,18 +633,7 @@ public class Main extends Application {
         editor.moveTo(clampedCaret);
     }
 
-    /**
-     * Applies bold OR italic to the currently selected text range.
-     *
-     * • With a selection  → toggle that property on every selected character
-     *   (Word-style: if ALL chars are already bold → un-bold; otherwise bold all)
-     *   and broadcast FORMAT messages.
-     * • Without a selection → flip the "typing mode" flag so the next typed
-     *   characters will be bold/italic.
-     *
-     * @param isBoldToggle   true when the Bold   button was clicked
-     * @param isItalicToggle true when the Italic button was clicked
-     */
+
     private void applyFormattingToSelection(boolean isBoldToggle, boolean isItalicToggle) {
         if (editor == null) return;
 
